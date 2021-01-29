@@ -2,16 +2,20 @@ package com.example.polaroh1
 
 import android.Manifest
 import android.content.Context
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.PowerManager
 import android.os.SystemClock
 import android.text.InputFilter
+import android.util.Log
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.core.widget.addTextChangedListener
+import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.disposables.Disposable
@@ -52,9 +56,12 @@ class MainActivity : AppCompatActivity() {
 
     private val mPolarStatus = MutableLiveData<PolarStatus>()
     private val mHR = MutableLiveData<PolarHrData>()
-    private val mPPG = MutableLiveData<MutableList<PolarOhrPPGData>>()
-    private val mPPI = MutableLiveData<MutableList<PolarOhrPPIData>>()
-    private val mACC = MutableLiveData<MutableList<PolarAccelerometerData>>()
+    private val mPPG: MutableLiveData<MutableList<PolarOhrPPGData>> =
+        MutableLiveData(mutableListOf())
+    private val mPPI: MutableLiveData<MutableList<PolarOhrPPIData>> =
+        MutableLiveData(mutableListOf())
+    private val mACC: MutableLiveData<MutableList<PolarAccelerometerData>> =
+        MutableLiveData(mutableListOf())
     private var mDeviceId = ""
     private var mRecording = MutableLiveData<Boolean>()
     private var mConnectionStartTime = 0L
@@ -79,6 +86,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
+
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
 
         /*
@@ -123,7 +132,6 @@ class MainActivity : AppCompatActivity() {
         btn_1.setOnClickListener(launchAppStore)
         btn_2.setOnClickListener(launchAppStore)
         btn_3.setOnClickListener(launchAppStore)*/
-
 
         //處理裝置連線狀態
         mPolarStatus.observe(this) { status ->
@@ -174,15 +182,15 @@ class MainActivity : AppCompatActivity() {
 
 
         mPPG.observe(this) { list ->
-            tv_ppg_value.text = "${list.map { it.samples }.toList().size ?: 0}"
+            tv_ppg_value.text = "count ${list.asSequence().flatMap { it.samples }.toList().size}"
         }
 
         mPPI.observe(this) { list ->
-            tv_ppi_value.text = "${list.map { it.samples }.toList().size ?: 0}"
+            tv_ppi_value.text = "count ${list.asSequence().flatMap { it.samples }.toList().size}"
         }
 
         mACC.observe(this) { list ->
-            tv_acc_value.text = "${list.map { it.samples }.toList().size ?: 0}"
+            tv_acc_value.text = "count ${list.asSequence().flatMap { it.samples }.toList().size}"
         }
 
 
@@ -202,6 +210,7 @@ class MainActivity : AppCompatActivity() {
                         },
                         {
                             println("ericyu - throwable: $it")
+                            mPolarStatus.value = PolarStatus.FAIL
                         }
                     )
 
@@ -222,6 +231,9 @@ class MainActivity : AppCompatActivity() {
                 if (mDeviceId.isNotBlank()) {
                     mPolarApi.disconnectFromDevice(mDeviceId)
                 }
+                progress_connection.isVisible = false
+                mPolarApi.cleanup()
+                mPolarStatus.value = PolarStatus.IDLE
             }
 
         }
@@ -301,22 +313,28 @@ class MainActivity : AppCompatActivity() {
                     .flatMap(Function<PolarSensorSetting, Publisher<PolarAccelerometerData>> { accSetting: PolarSensorSetting ->
                         mPolarApi.startAccStreaming(identifier, accSetting.maxSettings())
                     })
-                    .observeOn(AndroidSchedulers.mainThread())
+                    .observeOn(Schedulers.io())
                     .subscribe(
                         {
                             /*it.samples.forEachIndexed { _, data ->
                                 println("ericyu - MainActivity.acc, onNext x:${data.x}, y:${data.y}, z:${data.z}")
                                 tv_acc.text = "ACC  x:${data.x}, y:${data.y}, z:${data.z}"
                             }*/
-                            //每秒會
+                            //每1秒會
                             /*tv_acc_value.text = it.samples.lastOrNull()?.run {
                                 "time:${it.timeStamp}, size:${it.samples.size}, x:${this.x}, y:${this.y}, z:${this.z}"
                             }*/
+                            println("ericyu - MainActivity.acc, onRecieve ${it.samples.size}, ${mACC.value?.size}")
                             mACC.value?.add(it)
+                            mACC.postValue(mACC.value)
                         },
                         {
-                            println("ericyu - MainActivity.acc, onError ${it.localizedMessage}")
-                            tv_acc_value.text = "Error"
+                            Log.e(
+                                MainActivity::class.java.simpleName,
+                                "ericyu - MainActivity.acc, onError ${it.localizedMessage}"
+                            )
+//                            println("ericyu - MainActivity.acc, onError ${it.localizedMessage}")
+                            //tv_acc_value.text = "Error"
                         },
                         {
                             println("ericyu - MainActivity.acc, onComplete")
@@ -339,7 +357,7 @@ class MainActivity : AppCompatActivity() {
                         )
                     })
 //                    .throttleFirst(2000, TimeUnit.MILLISECONDS, Schedulers.io())
-                    .observeOn(AndroidSchedulers.mainThread())
+                    .observeOn(Schedulers.io())
                     .subscribe(
                         Consumer {
 
@@ -347,15 +365,18 @@ class MainActivity : AppCompatActivity() {
                             /*it.samples.forEachIndexed { _, data ->
                                 println("ericyu - MainActivity.ppg onNext,  ppg0: ${data.ppg0},  ppg1: ${data.ppg1}, ppg2: ${data.ppg2}, ambient: ${data.ambient}")
                             }*/
-
+                            println("ericyu - MainActivity.ppg, onRecieve ${it.samples.size}")
                             mPPG.value?.add(it)
                             /*tv_ppg_value.text = it.samples.lastOrNull()?.run {
                                 "time:${it.timeStamp}, size:${it.samples.size}, ppg0: ${ppg0},  ppg1: ${ppg1}, ppg2: ${ppg2}, ambient: ${ambient}}"
                             }*/
                         },
                         Consumer {
-                            println("ericyu - MainActivity.ppg onError, ${it.localizedMessage}")
-                            tv_ppg_value.text = "Error"
+                            Log.e(
+                                MainActivity::class.java.simpleName,
+                                "ericyu - MainActivity.ppg, onError ${it.localizedMessage}"
+                            )
+                            //tv_ppg_value.text = "Error"
                         },
                         Action {
                             println("ericyu - MainActivity.ppg onComplete")
@@ -382,6 +403,7 @@ class MainActivity : AppCompatActivity() {
                         /*tv_ppi_value.text = it.samples.lastOrNull()?.run {
                             "time:${it.timeStamp}, size:${it.samples.size}, ppi: ${ppi}"
                         }*/
+                        println("ericyu - MainActivity.ppi, onRecieve ${it.samples.size}")
                         mPPI.value?.add(it)
 
                     }
@@ -451,7 +473,8 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        mWakeLock.acquire(86400_000)
+
+        mWakeLock.acquire(86400000)
 
         when {
             (ContextCompat.checkSelfPermission(
