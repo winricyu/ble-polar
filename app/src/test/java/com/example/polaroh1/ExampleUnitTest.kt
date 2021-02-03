@@ -1,6 +1,9 @@
 package com.example.polaroh1
 
+import io.reactivex.rxjava3.core.BackpressureStrategy
+import io.reactivex.rxjava3.core.Flowable
 import io.reactivex.rxjava3.core.Observable
+import io.reactivex.rxjava3.functions.BiFunction
 import org.junit.Test
 
 import org.junit.Assert.*
@@ -40,7 +43,7 @@ class ExampleUnitTest {
     }
 
     @Test
-    fun flatMap(){
+    fun flatMap() {
         Observable.just("A", "B", "C")
             .flatMap { i ->
 
@@ -64,6 +67,32 @@ class ExampleUnitTest {
         //(2 : A)
         //(2 : C)
     }
+
+    @Test
+    fun merge() {
+        Observable.just(1, 2, 3, 4)
+            /*.zipWith(Observable.just(Result("user1", 99), Result("user2", 77)), BiFunction { id, result ->
+                UserData()
+            })*/
+           .zipWith(Observable.just("a","b","c","d","e"), BiFunction { id, result ->
+                FinalData()
+            })
+            /*.map {
+
+            }*/
+            /*.mergeWith  (
+//                Observable.just("a","b","c","d","e")
+                Observable.just(1, 2, 3, 4)
+            )*/
+            //.buffer(1000,TimeUnit.MILLISECONDS)
+            .subscribe {
+                println("ericyu - ExampleUnitTest.zipWith, $it")
+            }
+    }
+
+    data class Result(val id: String, val value: Int)
+    data class UserData(val name: String="", val id: String="", val age: Int=0)
+    data class FinalData(val code:Int=999)
 
 
 }

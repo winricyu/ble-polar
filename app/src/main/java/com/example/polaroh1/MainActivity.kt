@@ -2,7 +2,6 @@ package com.example.polaroh1
 
 import android.Manifest
 import android.content.Context
-import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.PowerManager
@@ -11,19 +10,22 @@ import android.text.InputFilter
 import android.util.Log
 import android.view.WindowManager
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.core.widget.addTextChangedListener
-import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
+import androidx.lifecycle.lifecycleScope
+import com.example.polaroh1.repository.RepositoryKit
+import com.example.polaroh1.repository.entity.ACCEntity
+import io.reactivex.rxjava3.core.Flowable
 import io.reactivex.rxjava3.disposables.Disposable
-import io.reactivex.rxjava3.functions.Action
-import io.reactivex.rxjava3.functions.Consumer
 import io.reactivex.rxjava3.functions.Function
 import io.reactivex.rxjava3.schedulers.Schedulers
 import kotlinx.android.synthetic.main.activity_main.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.reactivestreams.Publisher
 import polar.com.sdk.api.PolarBleApi
 import polar.com.sdk.api.PolarBleApiCallback
@@ -60,8 +62,7 @@ class MainActivity : AppCompatActivity() {
         MutableLiveData(mutableListOf())
     private val mPPI: MutableLiveData<MutableList<PolarOhrPPIData>> =
         MutableLiveData(mutableListOf())
-    private val mACC: MutableLiveData<MutableList<PolarAccelerometerData>> =
-        MutableLiveData(mutableListOf())
+    private val mACCCount: MutableLiveData<Int> = MutableLiveData(0)
     private var mDeviceId = ""
     private var mRecording = MutableLiveData<Boolean>()
     private var mConnectionStartTime = 0L
@@ -69,6 +70,9 @@ class MainActivity : AppCompatActivity() {
     private var mPPGDisposable: Disposable? = null
     private var mPPIDisposable: Disposable? = null
     private var mACCDisposable: Disposable? = null
+
+    private lateinit var mACCFlowable: Flowable<PolarAccelerometerData>
+    private lateinit var mPPGFlowable: Flowable<PolarOhrPPGData>
 
 
     private fun getPackageInstallSource(packageName: String): String? {
@@ -133,6 +137,7 @@ class MainActivity : AppCompatActivity() {
         btn_2.setOnClickListener(launchAppStore)
         btn_3.setOnClickListener(launchAppStore)*/
 
+
         //處理裝置連線狀態
         mPolarStatus.observe(this) { status ->
             println("ericyu - MainActivity.mPolarStatus: $status")
@@ -156,6 +161,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 PolarStatus.CONNECTED -> {
                     switch_connect.text = "已連線"
+                    switch_record.isChecked = true
                     mConnectionStartTime = SystemClock.elapsedRealtime()
                     tv_device_id.text = mDeviceId
                 }
@@ -189,8 +195,9 @@ class MainActivity : AppCompatActivity() {
             tv_ppi_value.text = "count ${list.asSequence().flatMap { it.samples }.toList().size}"
         }
 
-        mACC.observe(this) { list ->
-            tv_acc_value.text = "count ${list.asSequence().flatMap { it.samples }.toList().size}"
+        mACCCount.observe(this) { count ->
+            println("ericyu - MainActivity.tv_acc_value: $count")
+            tv_acc_value.text = "$count"
         }
 
 
@@ -256,6 +263,28 @@ class MainActivity : AppCompatActivity() {
             input_layout.error = null
         }
 
+        btn_clear.setOnClickListener {
+            lifecycleScope.launch {
+                AlertDialog.Builder(this@MainActivity)
+                    .setMessage("所有資料將被刪除且無法復原")
+                    .setPositiveButton(
+                        "刪除"
+                    ) { dialog, which ->
+                        println("ericyu - MainActivity.setPositiveButton, $which")
+                        lifecycleScope.launch(context = Dispatchers.IO) {
+                            RepositoryKit.clearAllData()
+                        }
+                        dialog.dismiss()
+                    }
+                    .setNegativeButton(
+                        "取消"
+                    ) { dialog, which ->
+                        println("ericyu - MainActivity.setPositiveButton, $which")
+                        dialog.dismiss()
+                    }.show()
+            }
+        }
+
         mPolarApi.setApiCallback(object : PolarBleApiCallback() {
 
             override fun blePowerStateChanged(powered: Boolean) {
@@ -314,32 +343,39 @@ class MainActivity : AppCompatActivity() {
                         mPolarApi.startAccStreaming(identifier, accSetting.maxSettings())
                     })
                     .observeOn(Schedulers.io())
+                    //.buffer(1000,TimeUnit.SECONDS)
+                    .map {
+                        it.samples.asSequence().mapIndexed { index, sample ->
+                            ACCEntity(
+                                timestamp = Date(it.timeStamp),
+                                index = index,
+                                x = sample.x,
+                                y = sample.y,
+                                z = sample.z
+                            )
+                        }.toList()
+                    }
                     .subscribe(
                         {
-                            /*it.samples.forEachIndexed { _, data ->
-                                println("ericyu - MainActivity.acc, onNext x:${data.x}, y:${data.y}, z:${data.z}")
-                                tv_acc.text = "ACC  x:${data.x}, y:${data.y}, z:${data.z}"
-                            }*/
-                            //每1秒會
-                            /*tv_acc_value.text = it.samples.lastOrNull()?.run {
-                                "time:${it.timeStamp}, size:${it.samples.size}, x:${this.x}, y:${this.y}, z:${this.z}"
-                            }*/
-                            println("ericyu - MainActivity.acc, onRecieve ${it.samples.size}, ${mACC.value?.size}")
-                            mACC.value?.add(it)
-                            mACC.postValue(mACC.value)
+                            //Callback 每???收到資料
+                            println("ericyu - MainActivity.acc, onRecieve ${it.size}")
+                            if (!switch_record.isChecked) return@subscribe
+                            RepositoryKit.insertAll(*it.toTypedArray())
+                            mACCCount.apply {
+                                this.postValue(this.value?.plus(it.size))
+                            }
                         },
                         {
                             Log.e(
                                 MainActivity::class.java.simpleName,
                                 "ericyu - MainActivity.acc, onError ${it.localizedMessage}"
                             )
-//                            println("ericyu - MainActivity.acc, onError ${it.localizedMessage}")
-                            //tv_acc_value.text = "Error"
                         },
                         {
                             println("ericyu - MainActivity.acc, onComplete")
                         }
                     )
+
             }
 
             override fun ppgFeatureReady(identifier: String) {
@@ -359,26 +395,18 @@ class MainActivity : AppCompatActivity() {
 //                    .throttleFirst(2000, TimeUnit.MILLISECONDS, Schedulers.io())
                     .observeOn(Schedulers.io())
                     .subscribe(
-                        Consumer {
-
-                            //每150ms收到資料
-                            /*it.samples.forEachIndexed { _, data ->
-                                println("ericyu - MainActivity.ppg onNext,  ppg0: ${data.ppg0},  ppg1: ${data.ppg1}, ppg2: ${data.ppg2}, ambient: ${data.ambient}")
-                            }*/
+                        {
+                            //Callback 每150ms收到資料
                             println("ericyu - MainActivity.ppg, onRecieve ${it.samples.size}")
                             mPPG.value?.add(it)
-                            /*tv_ppg_value.text = it.samples.lastOrNull()?.run {
-                                "time:${it.timeStamp}, size:${it.samples.size}, ppg0: ${ppg0},  ppg1: ${ppg1}, ppg2: ${ppg2}, ambient: ${ambient}}"
-                            }*/
                         },
-                        Consumer {
+                        {
                             Log.e(
                                 MainActivity::class.java.simpleName,
                                 "ericyu - MainActivity.ppg, onError ${it.localizedMessage}"
                             )
-                            //tv_ppg_value.text = "Error"
                         },
-                        Action {
+                        {
                             println("ericyu - MainActivity.ppg onComplete")
                         }
                     )
@@ -395,14 +423,7 @@ class MainActivity : AppCompatActivity() {
                     .observeOn(Schedulers.io())
                     .subscribe {
 
-                        //每5秒收到資料
-                        /*it.samples.forEachIndexed { _, data ->
-                            println("ericyu - MainActivity.ppiFeatureReady ppi:${data.ppi}")
-                            tv_ppi_value.text = "${data.ppi}"
-                        }*/
-                        /*tv_ppi_value.text = it.samples.lastOrNull()?.run {
-                            "time:${it.timeStamp}, size:${it.samples.size}, ppi: ${ppi}"
-                        }*/
+                        //Callback 每5秒收到資料
                         println("ericyu - MainActivity.ppi, onRecieve ${it.samples.size}")
                         mPPI.value?.add(it)
 
@@ -517,8 +538,4 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-}
-
-fun PolarHrData.print(): String {
-    return "HR: $hr"
 }
