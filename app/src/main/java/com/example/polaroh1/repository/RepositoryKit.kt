@@ -2,10 +2,7 @@ package com.example.polaroh1.repository
 
 import android.content.Context
 import androidx.room.Room
-import com.example.polaroh1.repository.entity.ACCEntity
-import com.example.polaroh1.repository.entity.HREntity
-import com.example.polaroh1.repository.entity.PPGEntity
-import com.example.polaroh1.repository.entity.PPIEntity
+import com.example.polaroh1.repository.entity.*
 
 object RepositoryKit {
 
@@ -25,15 +22,17 @@ object RepositoryKit {
         databaseManager.getHRDao().insert(hrEntity)
     }
 
+    fun insertHRList(vararg samples: HREntity) {
+        databaseManager.getHRDao().insertAll(*samples)
+    }
+
     fun insertACCList(vararg samples: ACCEntity) {
         databaseManager.getACCDao().insertAll(*samples)
     }
 
-
     fun insertPPGList(vararg samples: PPGEntity) {
         databaseManager.getPPGDao().insertAll(*samples)
     }
-
 
     fun insertPPIList(vararg samples: PPIEntity) {
         databaseManager.getPPIDao().insertAll(*samples)
@@ -43,8 +42,11 @@ object RepositoryKit {
 
     fun queryAllACCAsync() = databaseManager.getACCDao().queryAllAsync()
 
+    fun insertRecord(recordEntity: RecordEntity) =
+        databaseManager.getRecordDao().insert(recordEntity)
 
-    fun clearAllData() {
+
+    fun clearAllTables() {
         println("ericyu - RepositoryKit.clearAllData")
         databaseManager.clearAllTables()
     }

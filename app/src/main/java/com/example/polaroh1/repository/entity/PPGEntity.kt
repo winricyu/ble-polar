@@ -16,6 +16,8 @@ import java.util.*
 data class PPGEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
+    @ColumnInfo(name = "RECORD_ID")
+    var recordId: Long = 0,
     @ColumnInfo(name = "TIMESTAMP")
     val timestamp: Date,
     @ColumnInfo(name = "INDEX")

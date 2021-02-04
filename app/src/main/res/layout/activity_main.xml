@@ -18,8 +18,8 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:hint="POLAR DEVICE ID"
-            app:helperText="輸入 ID 點選開始配對"
+            android:hint="Device ID"
+            app:helperText="輸入 Device ID 開始配對"
             app:helperTextEnabled="true"
             app:layout_constraintEnd_toEndOf="@id/guideline_end"
             app:layout_constraintStart_toStartOf="@id/guideline_start"
@@ -31,6 +31,8 @@
                 android:layout_height="wrap_content"
                 android:inputType="textCapCharacters"
                 android:textAllCaps="true"
+                android:nextFocusDown="@id/switch_connect"
+                android:imeOptions="actionGo"
                 android:textSize="18dp" />
         </com.google.android.material.textfield.TextInputLayout>
 

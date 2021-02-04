@@ -9,12 +9,12 @@ class IntListConverter {
 
     @TypeConverter
     fun intListToString(list: List<Int>): String {
-        return if (list.isEmpty()) "" else list.joinToString("_")
+        return if (list.isEmpty()) "" else list.joinToString(",")
     }
 
     @TypeConverter
     fun stringToIntList(data: String): List<Int> {
-        return if (data.isNullOrBlank()) listOf() else data.split("_").map { it.toInt() }
+        return if (data.isNullOrBlank()) listOf() else data.split(",").map { it.toInt() }
 
     }
 }
