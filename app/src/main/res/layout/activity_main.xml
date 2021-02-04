@@ -407,7 +407,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:enabled="false"
+            android:enabled="true"
             android:text="下載資料"
             android:textSize="30sp"
             app:layout_constraintEnd_toEndOf="parent"

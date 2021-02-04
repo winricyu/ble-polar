@@ -71,7 +71,7 @@ class MainActivity : AppCompatActivity() {
     private var mPPGDisposable: Disposable? = null
     private var mPPIDisposable: Disposable? = null
     private var mACCDisposable: Disposable? = null
-
+    private var mDataLock: Boolean = false
     private var mTimer: Timer? = null
 
     private lateinit var mCollectDataJob: Job
@@ -90,46 +90,106 @@ class MainActivity : AppCompatActivity() {
 
     }
 
+    private suspend fun insertHRList(recordId: Long) {
+        println("MainActivity.insertHRList , recordId = [${recordId}]")
+        mViewModel.currentHRList.value?.run {
+//            sb.append("HR:${this.size}, ")
+            RepositoryKit.insertHRList(*this.asSequence().onEach {
+                it.recordId = recordId
+            }.toList().toTypedArray())
+            this.clear()
+        }
+    }
+
+    private suspend fun insertPPGList(recordId: Long) {
+        println("MainActivity.insertPPGList , recordId = [${recordId}]")
+        mViewModel.currentPPGList.value?.run {
+//            sb.append("PPG:${this.size}, ")
+            RepositoryKit.insertPPGList(*this.asSequence().onEach {
+                it.recordId = recordId
+            }.toList().toTypedArray())
+            this.clear()
+        }
+    }
+
+    private suspend fun insertPPIList(recordId: Long) {
+        println("MainActivity.insertPPIList , recordId = [${recordId}]")
+        mViewModel.currentPPIList.value?.run {
+            //sb.append("PPI:${this.size}, ")
+            RepositoryKit.insertPPIList(*this.asSequence().onEach {
+                it.recordId = recordId
+            }.toList().toTypedArray())
+            this.clear()
+        }
+    }
+
+    private suspend fun insertACCList(recordId: Long) {
+        println("MainActivity.insertACCList , recordId = [${recordId}]")
+        mViewModel.currentACCList.value?.run {
+            //sb.append("ACC:${this.size}")
+            RepositoryKit.insertACCList(*this.asSequence().onEach {
+                it.recordId = recordId
+            }.toList().toTypedArray())
+            this.clear()
+        }
+    }
+
     private fun initCollectDataJob() {
         mCollectDataJob =
             lifecycleScope.launch(context = Dispatchers.IO, start = CoroutineStart.LAZY) {
 
                 //Polar OH1 可使用12小時
                 repeat(43200) { repeatCount ->
-                    val sb = StringBuilder()
-                    sb.append("ericyu - MainActivity.repeat $repeatCount, ")
-                    //TODO 每秒收集HR, PPG, PPI, ACC 暫存資料寫入DB
+
                     val recordId =
                         RepositoryKit.insertRecord(RecordEntity(timestamp = Date(System.currentTimeMillis())))
-                    mViewModel.currentHRList.value?.run {
-                        sb.append("HR:${this.size}, ")
-                        RepositoryKit.insertHRList(*this.asSequence().onEach {
-                            it.recordId = recordId
-                        }.toList().toTypedArray())
-                        this.clear()
+
+                    runBlocking {
+                        mDataLock = true
+                        println("MainActivity.initCollectDataJob runBlocking 1 mDataLock:$mDataLock")
+                        val hr = async { insertHRList(recordId) }
+                        hr.await()
+                        val ppg = async { insertPPGList(recordId) }
+                        ppg.await()
+                        val ppi = async { insertPPIList(recordId) }
+                        ppi.await()
+                        val acc = async { insertACCList(recordId) }
+                        acc.await()
+                        println("MainActivity.initCollectDataJob runBlocking mDataLock:$mDataLock")
                     }
-                    mViewModel.currentPPGList.value?.run {
+                    mDataLock = false
+//                    val sb = StringBuilder()
+//                    sb.append("ericyu - MainActivity.repeat $repeatCount, ")
+                    //TODO 每秒收集HR, PPG, PPI, ACC 暫存資料寫入DB
+
+                    /* mViewModel.currentHRList.value?.run {
+                         sb.append("HR:${this.size}, ")
+                         RepositoryKit.insertHRList(*this.asSequence().onEach {
+                             it.recordId = recordId
+                         }.toList().toTypedArray())
+                         this.clear()
+                     }*/
+                    /*mViewModel.currentPPGList.value?.run {
                         sb.append("PPG:${this.size}, ")
                         RepositoryKit.insertPPGList(*this.asSequence().onEach {
                             it.recordId = recordId
                         }.toList().toTypedArray())
                         this.clear()
-                    }
-                    mViewModel.currentPPIList.value?.run {
+                    }*/
+                    /*mViewModel.currentPPIList.value?.run {
                         sb.append("PPI:${this.size}, ")
                         RepositoryKit.insertPPIList(*this.asSequence().onEach {
                             it.recordId = recordId
                         }.toList().toTypedArray())
                         this.clear()
-                    }
-                    mViewModel.currentACCList.value?.run {
+                    }*/
+                    /*mViewModel.currentACCList.value?.run {
                         sb.append("ACC:${this.size}")
                         RepositoryKit.insertACCList(*this.asSequence().onEach {
                             it.recordId = recordId
                         }.toList().toTypedArray())
                         this.clear()
-                    }
-                    println(sb.toString())
+                    }*/
                     delay(1000)
                 }
 
@@ -312,8 +372,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         mRecording.observe(this) { recording ->
-//            group_record.isVisible = recording
-            btn_download.isEnabled = !recording
+            //TODO 測試下載
+            //btn_download.isEnabled = !recording
             btn_clear.isEnabled = !recording
         }
 
@@ -439,8 +499,9 @@ class MainActivity : AppCompatActivity() {
                     .subscribe(
                         {
                             //每???ms收到資料
-                            println("ericyu - MainActivity.acc, onRecieved ${it.size}")
+                            println("ericyu - MainActivity.acc, onRecieved ${it.size}, mDataLock:${mDataLock}")
                             if (!switch_record.isChecked) return@subscribe
+                            if (mDataLock) return@subscribe
                             mViewModel.currentACCList.apply {
                                 this.value?.addAll(it)
                                 this.postValue(this.value)
@@ -493,8 +554,9 @@ class MainActivity : AppCompatActivity() {
                     .subscribe(
                         {
                             //每150ms收到資料
-                            println("ericyu - MainActivity.ppg, onRecieved ${it.size}")
+                            println("ericyu - MainActivity.ppg, onRecieved ${it.size}, mDataLock:${mDataLock}")
                             if (!switch_record.isChecked) return@subscribe
+                            if (mDataLock) return@subscribe
 
                             mViewModel.currentPPGList.apply {
                                 this.value?.addAll(it)
@@ -542,8 +604,9 @@ class MainActivity : AppCompatActivity() {
                     .subscribe {
 
                         //每5000ms收到資料
-                        println("ericyu - MainActivity.ppi, onRecieve ${it.size}")
+                        println("ericyu - MainActivity.ppi, onRecieve ${it.size}, mDataLock:${mDataLock}")
                         if (!switch_record.isChecked) return@subscribe
+                        if (mDataLock) return@subscribe
 
                         mViewModel.currentPPIList.apply {
                             this.value?.addAll(it)
@@ -579,10 +642,11 @@ class MainActivity : AppCompatActivity() {
 
             override fun hrNotificationReceived(identifier: String, data: PolarHrData) {
                 super.hrNotificationReceived(identifier, data)
-                println("ericyu - MainActivity.hrNotificationReceived, identifier = [${identifier}], hr = [${data.hr}]")
+                println("ericyu - MainActivity.hrNotificationReceived, identifier = [${identifier}], hr = [${data.hr}], mDataLock:${mDataLock}")
                 //TODO 取得HR
                 tv_hr_value.text = "${data.hr}"
                 if (!switch_record.isChecked) return
+                if (mDataLock) return
 
                 mViewModel.currentHRList.apply {
                     this.value?.add(HREntity(hr = data.hr))
@@ -684,16 +748,19 @@ class MainActivity : AppCompatActivity() {
 
     private fun downloadFile() {
         println("ericyu - MainActivity.downloadFile")
-        lifecycleScope.launch(Dispatchers.IO) {
+        /*lifecycleScope.launch(Dispatchers.IO) {
             RepositoryKit.queryAllRecords().onEach { record ->
 
-                lifecycleScope.launch(Dispatchers.Main) {
 
-                    RepositoryKit.queryAllACCByRecordId().observe(this@MainActivity) {
-                        println("ericyu - MainActivity.downloadFile, recordId:${record.id}, $it")
-                    }
-                }
             }
+        }*/
+        lifecycleScope.launch(Dispatchers.Main) {
+
+            RepositoryKit.queryRecordAndDetailAsync().observe(this@MainActivity) {
+                println("ericyu - MainActivity.downloadFile, result:${it.size}")
+            }
+
+
         }
 
     }

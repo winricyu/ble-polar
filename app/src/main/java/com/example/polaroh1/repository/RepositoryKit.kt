@@ -14,40 +14,42 @@ object RepositoryKit {
             Room.databaseBuilder(context, DatabaseManager::class.java, "PolarDB").build()
     }
 
-    fun insertACC(accEntity: ACCEntity) {
+    suspend fun insertACC(accEntity: ACCEntity) {
         databaseManager.getACCDao().insert(accEntity)
     }
 
-    fun insertHR(hrEntity: HREntity) {
+    suspend fun insertHR(hrEntity: HREntity) {
         databaseManager.getHRDao().insert(hrEntity)
     }
 
-    fun insertHRList(vararg samples: HREntity) {
+    suspend fun insertHRList(vararg samples: HREntity) {
         databaseManager.getHRDao().insertAll(*samples)
     }
 
-    fun insertACCList(vararg samples: ACCEntity) {
+    suspend fun insertACCList(vararg samples: ACCEntity) {
         databaseManager.getACCDao().insertAll(*samples)
     }
 
-    fun insertPPGList(vararg samples: PPGEntity) {
+    suspend fun insertPPGList(vararg samples: PPGEntity) {
         databaseManager.getPPGDao().insertAll(*samples)
     }
 
-    fun insertPPIList(vararg samples: PPIEntity) {
+    suspend fun insertPPIList(vararg samples: PPIEntity) {
         databaseManager.getPPIDao().insertAll(*samples)
     }
 
-    fun queryAllRecords() = databaseManager.getRecordDao().queryAll()
-    fun queryAllACC() = databaseManager.getACCDao().queryAll()
-    fun queryAllACCByRecordId()=databaseManager.getRecordDao().queryByRecordIdAsync()
-    fun queryAllACCAsync() = databaseManager.getACCDao().queryAllAsync()
+    suspend fun queryAllRecords() = databaseManager.getRecordDao().queryAll()
+    suspend fun queryAllACC() = databaseManager.getACCDao().queryAll()
+    suspend fun queryRecordAndDetailAsync() =
+        databaseManager.getRecordDao().queryRecordAndDetailAsync()
 
-    fun insertRecord(recordEntity: RecordEntity) =
+    suspend fun queryAllACCAsync() = databaseManager.getACCDao().queryAllAsync()
+
+    suspend fun insertRecord(recordEntity: RecordEntity) =
         databaseManager.getRecordDao().insert(recordEntity)
 
 
-    fun clearAllTables() {
+    suspend fun clearAllTables() {
         println("ericyu - RepositoryKit.clearAllData")
         databaseManager.clearAllTables()
     }

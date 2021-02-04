@@ -14,16 +14,10 @@ import java.util.*
 data class ACCEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
-    @ColumnInfo(name = "RECORD_ID")
     var recordId: Long = 0,
-    @ColumnInfo(name = "TIMESTAMP")
     val timestamp: Date = Date(0),
-    @ColumnInfo(name = "INDEX")
     val index: Int = 0,
-    @ColumnInfo(name = "X")
     val x: Int = 0,
-    @ColumnInfo(name = "Y")
     val y: Int = 0,
-    @ColumnInfo(name = "Z")
     val z: Int = 0
 )

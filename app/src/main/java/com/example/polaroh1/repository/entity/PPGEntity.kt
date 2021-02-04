@@ -16,24 +16,14 @@ import java.util.*
 data class PPGEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
-    @ColumnInfo(name = "RECORD_ID")
     var recordId: Long = 0,
-    @ColumnInfo(name = "TIMESTAMP")
     val timestamp: Date,
-    @ColumnInfo(name = "INDEX")
     val index: Int = 0,
-    @ColumnInfo(name = "PPG0")
     val ppg0: Int = 0,
-    @ColumnInfo(name = "PPG1")
     val ppg1: Int = 0,
-    @ColumnInfo(name = "PPG2")
     val ppg2: Int = 0,
-    @ColumnInfo(name = "AMBIENT")
     val ambient: Int = 0,
-    @ColumnInfo(name = "PPG_DATA_SAMPLES")
     val ppgDataSamples: List<Int>,
-    @ColumnInfo(name = "AMBIENT2")
     val ambient2: Int = 0,
-    @ColumnInfo(name = "STATUS")
     val status: Long = 0,
 )
