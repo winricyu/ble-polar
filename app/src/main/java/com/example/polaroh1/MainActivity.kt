@@ -352,6 +352,15 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        btn_download.setOnClickListener {
+            lifecycleScope.launch(Dispatchers.IO) {
+                val size = RepositoryKit.queryAllRecords().size
+                println("ericyu - MainActivity.btn_download queryAllRecords:$size")
+                if (size <= 0) return@launch
+                downloadFile()
+            }
+        }
+
 
         mViewModel.polarApi.setApiLogger {
             println("ericyu - MainActivity.setApiLogger: $it")
@@ -673,5 +682,20 @@ class MainActivity : AppCompatActivity() {
         tv_acc_value.text = "--"
     }
 
+    private fun downloadFile() {
+        println("ericyu - MainActivity.downloadFile")
+        lifecycleScope.launch(Dispatchers.IO) {
+            RepositoryKit.queryAllRecords().onEach { record ->
+
+                lifecycleScope.launch(Dispatchers.Main) {
+
+                    RepositoryKit.queryAllACCByRecordId().observe(this@MainActivity) {
+                        println("ericyu - MainActivity.downloadFile, recordId:${record.id}, $it")
+                    }
+                }
+            }
+        }
+
+    }
 
 }

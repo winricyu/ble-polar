@@ -38,8 +38,9 @@ object RepositoryKit {
         databaseManager.getPPIDao().insertAll(*samples)
     }
 
+    fun queryAllRecords() = databaseManager.getRecordDao().queryAll()
     fun queryAllACC() = databaseManager.getACCDao().queryAll()
-
+    fun queryAllACCByRecordId()=databaseManager.getRecordDao().queryByRecordIdAsync()
     fun queryAllACCAsync() = databaseManager.getACCDao().queryAllAsync()
 
     fun insertRecord(recordEntity: RecordEntity) =
