@@ -2,6 +2,7 @@ package com.example.polaroh1
 
 import android.Manifest
 import android.content.Context
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.PowerManager
@@ -15,59 +16,71 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.core.widget.addTextChangedListener
+import androidx.datastore.core.DataStore
+import androidx.datastore.createDataStore
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.example.polaroh1.repository.RepositoryKit
 import com.example.polaroh1.repository.entity.ACCEntity
+import com.example.polaroh1.repository.entity.HREntity
+import com.example.polaroh1.repository.entity.PPGEntity
+import com.example.polaroh1.repository.entity.PPIEntity
+import com.example.polaroh1.utils.MainViewModel
+import com.example.polaroh1.utils.MainViewModelFactory
+import io.reactivex.rxjava3.core.BackpressureStrategy
 import io.reactivex.rxjava3.core.Flowable
+import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.disposables.Disposable
 import io.reactivex.rxjava3.functions.Function
 import io.reactivex.rxjava3.schedulers.Schedulers
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 import org.reactivestreams.Publisher
-import polar.com.sdk.api.PolarBleApi
 import polar.com.sdk.api.PolarBleApiCallback
-import polar.com.sdk.api.PolarBleApiDefaultImpl
 import polar.com.sdk.api.model.*
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.prefs.Preferences
+
 
 class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val REQUEST_LOCATION_PERMISSIONS = 11
-
-        //private const val DEVICE_ID = "76643020"
         private const val MAX_LENGTH = 8
-
+        private const val DEVICE_ID = "DEVICE_ID"
     }
 
-    private val mPolarApi by lazy {
-        PolarBleApiDefaultImpl.defaultImplementation(
-            this,
-            PolarBleApi.ALL_FEATURES
-        )
+    private val mViewModel by lazy {
+//        ViewModelProvider(this).get(MainViewModel::class.java)
+        ViewModelProvider(this, mViewModelFactory).get(MainViewModel::class.java)
+
     }
+    private val mViewModelFactory by lazy {
+        MainViewModelFactory(application)
+    }
+
 
     private val mWakeLock by lazy {
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, getString(R.string.app_name))
     }
 
+    private val mSharedPreferences by lazy {
+        getSharedPreferences("local_storage", MODE_PRIVATE)
+    }
+
     private val mPolarStatus = MutableLiveData<PolarStatus>()
-    private val mHR = MutableLiveData<PolarHrData>()
-    private val mPPG: MutableLiveData<MutableList<PolarOhrPPGData>> =
-        MutableLiveData(mutableListOf())
-    private val mPPI: MutableLiveData<MutableList<PolarOhrPPIData>> =
-        MutableLiveData(mutableListOf())
-    private val mACCCount: MutableLiveData<Int> = MutableLiveData(0)
+
     private var mDeviceId = ""
     private var mRecording = MutableLiveData<Boolean>()
     private var mConnectionStartTime = 0L
 
     private var mPPGDisposable: Disposable? = null
+    private var mHRDisposable: Disposable? = null
     private var mPPIDisposable: Disposable? = null
     private var mACCDisposable: Disposable? = null
 
@@ -92,7 +105,6 @@ class MainActivity : AppCompatActivity() {
         super.onStart()
 
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-
 
         /*
         //TODO 開啟APP安裝來源
@@ -137,7 +149,6 @@ class MainActivity : AppCompatActivity() {
         btn_2.setOnClickListener(launchAppStore)
         btn_3.setOnClickListener(launchAppStore)*/
 
-
         //處理裝置連線狀態
         mPolarStatus.observe(this) { status ->
             println("ericyu - MainActivity.mPolarStatus: $status")
@@ -161,7 +172,6 @@ class MainActivity : AppCompatActivity() {
                 }
                 PolarStatus.CONNECTED -> {
                     switch_connect.text = "已連線"
-                    switch_record.isChecked = true
                     mConnectionStartTime = SystemClock.elapsedRealtime()
                     tv_device_id.text = mDeviceId
                 }
@@ -176,7 +186,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        mHR.observe(this) {
+        mViewModel.mHR.observe(this) {
             tv_hr_value.text = it.hr.toString()
             val duration = (SystemClock.elapsedRealtime() - mConnectionStartTime)
             tv_device_info.text =
@@ -187,16 +197,15 @@ class MainActivity : AppCompatActivity() {
         }
 
 
-        mPPG.observe(this) { list ->
-            tv_ppg_value.text = "count ${list.asSequence().flatMap { it.samples }.toList().size}"
+        mViewModel.mPPG.observe(this) { count ->
+            tv_ppg_value.text = "$count"
         }
 
-        mPPI.observe(this) { list ->
-            tv_ppi_value.text = "count ${list.asSequence().flatMap { it.samples }.toList().size}"
+        mViewModel.mPPI.observe(this) { count ->
+            tv_ppi_value.text = "$count"
         }
 
-        mACCCount.observe(this) { count ->
-            println("ericyu - MainActivity.tv_acc_value: $count")
+        mViewModel.mACCCount.observe(this) { count ->
             tv_acc_value.text = "$count"
         }
 
@@ -211,7 +220,7 @@ class MainActivity : AppCompatActivity() {
 
                 if (deviceId.isBlank()) {
                     mPolarStatus.value = PolarStatus.SEARCHING
-                    mPolarApi.autoConnectToDevice(-50, "180D", null).subscribe(
+                    mViewModel.mPolarApi.autoConnectToDevice(-50, "180D", null).subscribe(
                         {
                             println("ericyu - auto connect search complete")
                         },
@@ -230,16 +239,16 @@ class MainActivity : AppCompatActivity() {
 
                     if (input_layout.error.isNullOrBlank()) {
                         mPolarStatus.value = PolarStatus.SEARCHING
-                        mPolarApi.connectToDevice(deviceId)
+                        mViewModel.mPolarApi.connectToDevice(deviceId)
                     }
                 }
 
             } else {
                 if (mDeviceId.isNotBlank()) {
-                    mPolarApi.disconnectFromDevice(mDeviceId)
+                    mViewModel.mPolarApi.disconnectFromDevice(mDeviceId)
                 }
                 progress_connection.isVisible = false
-                mPolarApi.cleanup()
+                mViewModel.mPolarApi.cleanup()
                 mPolarStatus.value = PolarStatus.IDLE
             }
 
@@ -285,7 +294,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        mPolarApi.setApiCallback(object : PolarBleApiCallback() {
+        mViewModel.mPolarApi.setApiCallback(object : PolarBleApiCallback() {
 
             override fun blePowerStateChanged(powered: Boolean) {
                 super.blePowerStateChanged(powered)
@@ -303,6 +312,7 @@ class MainActivity : AppCompatActivity() {
                 super.deviceConnected(polarDeviceInfo)
                 println("ericyu - MainActivity.deviceConnected, polarDeviceInfo = [${polarDeviceInfo}]")
                 mDeviceId = polarDeviceInfo.deviceId
+                mSharedPreferences.edit().putString(DEVICE_ID, polarDeviceInfo.deviceId).apply()
                 mPolarStatus.value = PolarStatus.CONNECTED
             }
 
@@ -316,10 +326,10 @@ class MainActivity : AppCompatActivity() {
                 super.deviceDisconnected(polarDeviceInfo)
                 println("ericyu - MainActivity.deviceDisconnected, polarDeviceInfo = [${polarDeviceInfo}]")
                 mDeviceId = ""
-                tv_hr_value.text = ""
-                tv_ppg_value.text = ""
-                tv_ppi_value.text = ""
-                tv_acc_value.text = ""
+//                tv_hr_value.text = "--"
+//                tv_ppg_value.text = "--"
+//                tv_ppi_value.text = "--"
+//                tv_acc_value.text = "--"
                 mPPGDisposable?.dispose()
                 mPPIDisposable?.dispose()
                 mACCDisposable?.dispose()
@@ -334,34 +344,35 @@ class MainActivity : AppCompatActivity() {
             override fun accelerometerFeatureReady(identifier: String) {
                 super.accelerometerFeatureReady(identifier)
                 println("ericyu - MainActivity.accelerometerFeatureReady, identifier = [${identifier}]")
-
                 //TODO 取得ACC
-                tv_acc_value.text = "loading..."
-                mACCDisposable = mPolarApi.requestAccSettings(identifier)
+                tv_acc_value.text = "Ready..."
+                mACCDisposable = mViewModel.mPolarApi.requestAccSettings(identifier)
                     .toFlowable()
                     .flatMap(Function<PolarSensorSetting, Publisher<PolarAccelerometerData>> { accSetting: PolarSensorSetting ->
-                        mPolarApi.startAccStreaming(identifier, accSetting.maxSettings())
+                        mViewModel.mPolarApi.startAccStreaming(identifier, accSetting.maxSettings())
                     })
                     .observeOn(Schedulers.io())
                     //.buffer(1000,TimeUnit.SECONDS)
                     .map {
                         it.samples.asSequence().mapIndexed { index, sample ->
-                            ACCEntity(
-                                timestamp = Date(it.timeStamp),
-                                index = index,
-                                x = sample.x,
-                                y = sample.y,
-                                z = sample.z
-                            )
+                            sample.run {
+                                ACCEntity(
+                                    timestamp = Date(it.timeStamp),
+                                    index = index,
+                                    x = x,
+                                    y = y,
+                                    z = z
+                                )
+                            }
                         }.toList()
                     }
                     .subscribe(
                         {
                             //Callback 每???收到資料
-                            println("ericyu - MainActivity.acc, onRecieve ${it.size}")
+                            println("ericyu - MainActivity.acc, onRecieved ${it.size}")
                             if (!switch_record.isChecked) return@subscribe
-                            RepositoryKit.insertAll(*it.toTypedArray())
-                            mACCCount.apply {
+                            RepositoryKit.insertACCList(*it.toTypedArray())
+                            mViewModel.mACCCount.apply {
                                 this.postValue(this.value?.plus(it.size))
                             }
                         },
@@ -381,24 +392,44 @@ class MainActivity : AppCompatActivity() {
             override fun ppgFeatureReady(identifier: String) {
                 super.ppgFeatureReady(identifier)
                 println("ericyu - MainActivity.ppgFeatureReady, identifier = [${identifier}]")
-                tv_ppg_value.text = "loading..."
-
                 //TODO 取得PPG
-                mPPGDisposable = mPolarApi.requestPpgSettings(identifier)
+                tv_ppg_value.text = "Ready..."
+                mPPGDisposable = mViewModel.mPolarApi.requestPpgSettings(identifier)
                     .toFlowable()
                     .flatMap(Function<PolarSensorSetting, Publisher<PolarOhrPPGData>> { ppgSettings: PolarSensorSetting ->
-                        mPolarApi.startOhrPPGStreaming(
+                        mViewModel.mPolarApi.startOhrPPGStreaming(
                             identifier,
                             ppgSettings.maxSettings()
                         )
                     })
-//                    .throttleFirst(2000, TimeUnit.MILLISECONDS, Schedulers.io())
                     .observeOn(Schedulers.io())
+                    .map {
+                        it.samples.asSequence().mapIndexed { index, sample ->
+                            sample.run {
+                                PPGEntity(
+                                    timestamp = Date(it.timeStamp),
+                                    index = index,
+                                    ppg0 = ppg0,
+                                    ppg1 = ppg1,
+                                    ppg2 = ppg2,
+                                    ambient = ambient,
+                                    ambient2 = ambient2,
+                                    ppgDataSamples = ppgDataSamples,
+                                    status = status
+                                )
+                            }
+                        }.toList()
+                    }
                     .subscribe(
                         {
                             //Callback 每150ms收到資料
-                            println("ericyu - MainActivity.ppg, onRecieve ${it.samples.size}")
-                            mPPG.value?.add(it)
+                            println("ericyu - MainActivity.ppg, onRecieved ${it.size}")
+                            if (!switch_record.isChecked) return@subscribe
+                            RepositoryKit.insertPPGList(*it.toTypedArray())
+                            mViewModel.mPPG.apply {
+                                this.postValue(this.value?.plus(it.size))
+                            }
+
                         },
                         {
                             Log.e(
@@ -418,14 +449,34 @@ class MainActivity : AppCompatActivity() {
                 super.ppiFeatureReady(identifier)
                 println("ericyu - MainActivity.ppiFeatureReady, identifier = [${identifier}]")
                 //TODO 取得PPI
-                tv_ppi_value.text = "loading..."
-                mPPIDisposable = mPolarApi.startOhrPPIStreaming(identifier)
+                tv_ppi_value.text = "Ready..."
+                mPPIDisposable = mViewModel.mPolarApi.startOhrPPIStreaming(identifier)
                     .observeOn(Schedulers.io())
+                    .map {
+                        it.samples.asSequence().mapIndexed { index, sample ->
+                            sample.run {
+                                PPIEntity(
+                                    timestamp = Date(it.timeStamp),
+                                    index = index,
+                                    ppi = ppi,
+                                    hr = hr,
+                                    blockerBit = blockerBit,
+                                    errorEstimate = errorEstimate,
+                                    skinContactStatus = skinContactStatus,
+                                    skinContactSupported = skinContactSupported
+                                )
+                            }
+                        }.toList()
+                    }
                     .subscribe {
 
                         //Callback 每5秒收到資料
-                        println("ericyu - MainActivity.ppi, onRecieve ${it.samples.size}")
-                        mPPI.value?.add(it)
+                        println("ericyu - MainActivity.ppi, onRecieve ${it.size}")
+                        if (!switch_record.isChecked) return@subscribe
+                        RepositoryKit.insertPPIList(*it.toTypedArray())
+                        mViewModel.mPPI.apply {
+                            this.postValue(this.value?.plus(it.size))
+                        }
 
                     }
 
@@ -439,7 +490,7 @@ class MainActivity : AppCompatActivity() {
             override fun hrFeatureReady(identifier: String) {
                 super.hrFeatureReady(identifier)
                 println("ericyu - MainActivity.hrFeatureReady, identifier = [${identifier}]")
-                tv_hr_value.text = "loading..."
+                tv_hr_value.text = "Ready..."
             }
 
             override fun disInformationReceived(identifier: String, uuid: UUID, value: String) {
@@ -459,7 +510,21 @@ class MainActivity : AppCompatActivity() {
                 println("ericyu - MainActivity.hrNotificationReceived, identifier = [${identifier}], hr = [${data.hr}]")
 
                 //TODO 取得HR
-                mHR.value = data
+                mViewModel.mHR.value = data
+
+                if (!switch_record.isChecked) return
+                data.run {
+                    RepositoryKit.insertHR(
+                        HREntity(
+                            hr = hr,
+                            rrs = rrs,
+                            rrsMs = rrsMs,
+                            contactStatus = contactStatus,
+                            contactStatusSupported = contactStatusSupported,
+                            rrAvailable = rrAvailable
+                        )
+                    )
+                }
 
             }
 
@@ -474,26 +539,25 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         println("ericyu - MainActivity.onResume")
-        mPolarApi.foregroundEntered()
+        mViewModel.mPolarApi.foregroundEntered()
     }
 
     override fun onPause() {
         super.onPause()
         println("ericyu - MainActivity.onPause")
-        mPolarApi.backgroundEntered()
+        mViewModel.mPolarApi.backgroundEntered()
     }
 
     override fun onDestroy() {
         super.onDestroy()
         println("ericyu - MainActivity.onDestroy")
-        mPolarApi.shutDown()
+        mViewModel.mPolarApi.shutDown()
         mWakeLock.release()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
 
         mWakeLock.acquire(86400000)
 
@@ -517,6 +581,11 @@ class MainActivity : AppCompatActivity() {
                     ), Companion.REQUEST_LOCATION_PERMISSIONS
                 )
             }
+        }
+
+        //取得暫存device id
+        mSharedPreferences.getString(DEVICE_ID, "")?.takeIf { !it.isNullOrBlank() }?.run {
+            edt_device.setText(this)
         }
 
     }

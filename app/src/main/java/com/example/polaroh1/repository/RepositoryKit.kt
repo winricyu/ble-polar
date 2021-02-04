@@ -3,38 +3,50 @@ package com.example.polaroh1.repository
 import android.content.Context
 import androidx.room.Room
 import com.example.polaroh1.repository.entity.ACCEntity
+import com.example.polaroh1.repository.entity.HREntity
+import com.example.polaroh1.repository.entity.PPGEntity
+import com.example.polaroh1.repository.entity.PPIEntity
 
-class RepositoryKit {
+object RepositoryKit {
 
-    companion object {
-        private lateinit var databaseManager: DatabaseManager
+    private lateinit var databaseManager: DatabaseManager
 
-        fun setup(context: Context) {
-            println("ericyu - RepositoryKit.setup, context = [${context}]")
-            databaseManager =
-                Room.databaseBuilder(context, DatabaseManager::class.java, "PolarDB").build()
-        }
+    fun setup(context: Context) {
+        println("ericyu - RepositoryKit.setup, context = [${context}]")
+        databaseManager =
+            Room.databaseBuilder(context, DatabaseManager::class.java, "PolarDB").build()
+    }
 
-        fun insertACC(accEntity: ACCEntity) {
-            println("ericyu - RepositoryKit.insertACC, accEntity = [${accEntity}]")
-            databaseManager.getACCDao().insert(accEntity)
-        }
+    fun insertACC(accEntity: ACCEntity) {
+        databaseManager.getACCDao().insert(accEntity)
+    }
 
-        fun insertAll(vararg samples: ACCEntity) {
-            println("ericyu - RepositoryKit.insertAll, samples = [${samples}]")
-            databaseManager.getACCDao().insertAll(*samples)
-        }
+    fun insertHR(hrEntity: HREntity) {
+        databaseManager.getHRDao().insert(hrEntity)
+    }
 
-        fun queryAllACC() =databaseManager.getACCDao().queryAll()
-
-        fun queryAllACCAsync() = databaseManager.getACCDao().queryAllAsync()
+    fun insertACCList(vararg samples: ACCEntity) {
+        databaseManager.getACCDao().insertAll(*samples)
+    }
 
 
-        fun clearAllData() {
-            println("ericyu - RepositoryKit.clearAllData")
-            databaseManager.clearAllTables()
-        }
+    fun insertPPGList(vararg samples: PPGEntity) {
+        databaseManager.getPPGDao().insertAll(*samples)
+    }
 
+
+    fun insertPPIList(vararg samples: PPIEntity) {
+        databaseManager.getPPIDao().insertAll(*samples)
+    }
+
+    fun queryAllACC() = databaseManager.getACCDao().queryAll()
+
+    fun queryAllACCAsync() = databaseManager.getACCDao().queryAllAsync()
+
+
+    fun clearAllData() {
+        println("ericyu - RepositoryKit.clearAllData")
+        databaseManager.clearAllTables()
     }
 
 }
