@@ -408,7 +408,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:enabled="true"
+            android:enabled="false"
             android:text="下載資料"
             android:textSize="26sp"
             app:layout_constraintEnd_toEndOf="parent"
@@ -435,13 +435,31 @@
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:elevation="4dp"
-            android:visibility="gone"
             app:layout_constraintBottom_toBottomOf="@id/panel_content"
             app:layout_constraintDimensionRatio="1:1"
             app:layout_constraintEnd_toEndOf="@id/panel_content"
             app:layout_constraintStart_toStartOf="@id/panel_content"
             app:layout_constraintTop_toTopOf="@id/panel_content"
-            app:layout_constraintWidth_percent="0.3"
+            app:layout_constraintWidth_percent="0.3" />
+
+        <TextView
+            android:id="@+id/tv_loading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:elevation="4dp"
+            android:text="資料處理中"
+            android:textSize="14sp"
+            app:layout_constraintBottom_toBottomOf="@id/progress_loading"
+            app:layout_constraintEnd_toEndOf="@id/progress_loading"
+            app:layout_constraintStart_toStartOf="@id/progress_loading"
+            app:layout_constraintTop_toTopOf="@id/progress_loading" />
+
+        <androidx.constraintlayout.widget.Group
+            android:id="@+id/group_loading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            app:constraint_referenced_ids="progress_loading,tv_loading"
             tools:visibility="visible" />
 
 

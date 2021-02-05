@@ -2,10 +2,9 @@ package com.example.polaroh1
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.Bundle
-import android.os.PowerManager
-import android.os.SystemClock
+import android.os.*
 import android.text.InputFilter
 import android.util.Log
 import android.view.WindowManager
@@ -14,6 +13,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.core.view.isVisible
 import androidx.core.widget.addTextChangedListener
 import androidx.lifecycle.MutableLiveData
@@ -376,7 +376,7 @@ class MainActivity : AppCompatActivity() {
 
         mRecording.observe(this) { recording ->
             //TODO 測試下載
-            //btn_download.isEnabled = !recording
+            btn_download.isEnabled = !recording
             btn_clear.isEnabled = !recording
         }
 
@@ -417,14 +417,17 @@ class MainActivity : AppCompatActivity() {
 
         btn_download.setOnClickListener {
             lifecycleScope.launch(Dispatchers.IO) {
-                val size = RepositoryKit.queryAllRecords().size
-                println("ericyu - MainActivity.btn_download queryAllRecords:$size")
-                if (size <= 0) return@launch
+                if (RepositoryKit.queryAllRecords().isEmpty()) {
+                    runOnUiThread {
+                        Toast.makeText(this@MainActivity, "無資料", Toast.LENGTH_SHORT).show()
+                    }
+                    return@launch
+                }
                 downloadFile()
             }
         }
 
-
+        mViewModel.polarApi.setAutomaticReconnection(true)
         mViewModel.polarApi.setApiLogger {
             println("ericyu - MainActivity.setApiLogger: $it")
         }
@@ -701,6 +704,9 @@ class MainActivity : AppCompatActivity() {
                     ) == PackageManager.PERMISSION_GRANTED) and
                     (ContextCompat.checkSelfPermission(
                         this, Manifest.permission.WRITE_EXTERNAL_STORAGE
+                    ) == PackageManager.PERMISSION_GRANTED) and
+                    (ContextCompat.checkSelfPermission(
+                        this, Manifest.permission.READ_EXTERNAL_STORAGE
                     ) == PackageManager.PERMISSION_GRANTED) -> {
                 println("ericyu - MainActivity.onCreate, permissions granted")
 
@@ -754,55 +760,81 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun downloadFile() {
-        println("ericyu - MainActivity.downloadFile")
 
         lifecycleScope.launch(Dispatchers.Main) {
-            progress_loading.isVisible = true
+            group_loading.isVisible = true
             RepositoryKit.queryRecordAndDetailAsync().observe(this@MainActivity) {
                 println("ericyu - MainActivity.downloadFile, result:${it.size}")
 
                 runBlocking {
                     writeToCSV(it)
                 }
-
-                println("ericyu - MainActivity.csvWriter.csv 3}")
-
             }
-
-
         }
-
-
     }
 
 
     private suspend fun writeToCSV(list: List<RecordAndDetail>) {
-        println("MainActivity.writeToCSV")
         lifecycleScope.launch(Dispatchers.IO) {
-            println("ericyu - MainActivity.csvWriter.csv 1}")
-            val file = File("${this@MainActivity.cacheDir}/polar_data.csv")
-            val record = list.first()
+            var file: File? = null
+            val filePath = this@MainActivity.filesDir.toString() + "/images/polar_data.csv"
+            file = File(filePath)
+            if (!file.parentFile.exists()) {
+                file.parentFile.mkdir()
+            }
+            val fileUri =
+                FileProvider.getUriForFile(this@MainActivity, "polaroh1.fileprovider", file)
 
-            csvWriter().writeAll(
-                listOf(
-                    listOf(
-                        record.id,
-                        record.timestamp,
-                        "[${hrList.joinToString()}]",
-                        "[${ppgList.joinToString()}]",
-                        "[${ppiList.joinToString()}]",
-                        "[${accXList.joinToString()}]",
-                        "[${accYList.joinToString()}]",
-                        "[${accZList.joinToString()}]"
+            csvWriter().openAsync(file) {
+                writeRow(listOf("id", "timestamp", "hr", "ppg", "ppi", "x", "y", "z"))
+
+                list.onEach { detail ->
+
+                    writeRow(
+                        listOf(
+                            detail.record.id,
+                            detail.record.timestamp,
+                            "[${detail.hrList.joinToString()}]",
+                            "[${detail.ppgList.joinToString()}]",
+                            "[${detail.ppiList.joinToString()}]",
+                            "[${detail.accXList.joinToString()}]",
+                            "[${detail.accYList.joinToString()}]",
+                            "[${detail.accZList.joinToString()}]"
+                        )
                     )
-                )
-            ) {
-                //writeRow(listOf("id", "timestamp", "hr", "ppg", "ppi", "x", "y", "z"))
+                }
+            }
+
+            if (file.exists()) {
+
+                runOnUiThread {
+                    group_loading.isVisible = false
+                    val shareIntent: Intent = Intent().apply {
+                        action = Intent.ACTION_SEND
+                        putExtra(Intent.EXTRA_STREAM, fileUri)
+                        val createtime =
+                            SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).run {
+                                format(Date(System.currentTimeMillis()))
+                            }
+//                        val createDate = createtime.split(" ").firstOrNull() ?: ""
+                        putExtra(
+                            Intent.EXTRA_SUBJECT,
+                            "PolarOH1 [$mDeviceId] ${
+                                createtime.split(" ").firstOrNull() ?: ""
+                            } 追蹤紀錄"
+                        )
+                        putExtra(Intent.EXTRA_TEXT, "建立時間: $createtime")
+                        type = "text/csv"
+                        flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    }
+                    startActivity(Intent.createChooser(shareIntent, "分享檔案"))
+
+                }
 
             }
+
         }
-        println("ericyu - MainActivity.csvWriter.csv 2}")
     }
 }
 
-}
+
