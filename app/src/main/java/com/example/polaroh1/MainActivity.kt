@@ -23,6 +23,7 @@ import com.example.polaroh1.repository.RepositoryKit
 import com.example.polaroh1.repository.entity.*
 import com.example.polaroh1.utils.MainViewModel
 import com.example.polaroh1.utils.MainViewModelFactory
+import com.github.doyaaaaaken.kotlincsv.dsl.csvWriter
 import io.reactivex.rxjava3.disposables.Disposable
 import io.reactivex.rxjava3.functions.Function
 import io.reactivex.rxjava3.schedulers.Schedulers
@@ -31,6 +32,7 @@ import kotlinx.coroutines.*
 import org.reactivestreams.Publisher
 import polar.com.sdk.api.PolarBleApiCallback
 import polar.com.sdk.api.model.*
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -75,6 +77,7 @@ class MainActivity : AppCompatActivity() {
     private var mTimer: Timer? = null
 
     private lateinit var mCollectDataJob: Job
+
 
     private fun getPackageInstallSource(packageName: String): String? {
         return try {
@@ -691,12 +694,14 @@ class MainActivity : AppCompatActivity() {
 
         when {
             (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED) and (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED) -> {
+                this, Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED) and
+                    (ContextCompat.checkSelfPermission(
+                        this, Manifest.permission.ACCESS_FINE_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED) and
+                    (ContextCompat.checkSelfPermission(
+                        this, Manifest.permission.WRITE_EXTERNAL_STORAGE
+                    ) == PackageManager.PERMISSION_GRANTED) -> {
                 println("ericyu - MainActivity.onCreate, permissions granted")
 
             }
@@ -705,7 +710,9 @@ class MainActivity : AppCompatActivity() {
                 requestPermissions(
                     arrayOf(
                         Manifest.permission.ACCESS_COARSE_LOCATION,
-                        Manifest.permission.ACCESS_FINE_LOCATION
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                        Manifest.permission.READ_EXTERNAL_STORAGE,
                     ), Companion.REQUEST_LOCATION_PERMISSIONS
                 )
             }
@@ -748,21 +755,54 @@ class MainActivity : AppCompatActivity() {
 
     private fun downloadFile() {
         println("ericyu - MainActivity.downloadFile")
-        /*lifecycleScope.launch(Dispatchers.IO) {
-            RepositoryKit.queryAllRecords().onEach { record ->
 
-
-            }
-        }*/
         lifecycleScope.launch(Dispatchers.Main) {
-
+            progress_loading.isVisible = true
             RepositoryKit.queryRecordAndDetailAsync().observe(this@MainActivity) {
                 println("ericyu - MainActivity.downloadFile, result:${it.size}")
+
+                runBlocking {
+                    writeToCSV(it)
+                }
+
+                println("ericyu - MainActivity.csvWriter.csv 3}")
+
             }
 
 
         }
 
+
     }
+
+
+    private suspend fun writeToCSV(list: List<RecordAndDetail>) {
+        println("MainActivity.writeToCSV")
+        lifecycleScope.launch(Dispatchers.IO) {
+            println("ericyu - MainActivity.csvWriter.csv 1}")
+            val file = File("${this@MainActivity.cacheDir}/polar_data.csv")
+            val record = list.first()
+
+            csvWriter().writeAll(
+                listOf(
+                    listOf(
+                        record.id,
+                        record.timestamp,
+                        "[${hrList.joinToString()}]",
+                        "[${ppgList.joinToString()}]",
+                        "[${ppiList.joinToString()}]",
+                        "[${accXList.joinToString()}]",
+                        "[${accYList.joinToString()}]",
+                        "[${accZList.joinToString()}]"
+                    )
+                )
+            ) {
+                //writeRow(listOf("id", "timestamp", "hr", "ppg", "ppi", "x", "y", "z"))
+
+            }
+        }
+        println("ericyu - MainActivity.csvWriter.csv 2}")
+    }
+}
 
 }

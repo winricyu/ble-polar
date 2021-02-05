@@ -6,7 +6,7 @@ import androidx.room.Relation
 data class RecordAndDetail(
 
     @Embedded
-    val record: RecordEntity?,
+    val record: RecordEntity = RecordEntity(),
 
     @Relation(
         parentColumn = "id",
@@ -14,7 +14,7 @@ data class RecordAndDetail(
         entity = HREntity::class,
         projection = ["hr"]
     )
-    val hrList: List<Int>?,
+    val hrList: List<Int> = listOf(),
 
     @Relation(
         parentColumn = "id",
@@ -22,7 +22,7 @@ data class RecordAndDetail(
         entity = PPGEntity::class,
         projection = ["ppg0"]
     )
-    val ppgList: List<Int>?,
+    val ppgList: List<Int> = listOf(),
 
     @Relation(
         parentColumn = "id",
@@ -30,7 +30,7 @@ data class RecordAndDetail(
         entity = PPIEntity::class,
         projection = ["ppi"]
     )
-    val ppiList: List<Int>?,
+    val ppiList: List<Int> = listOf(),
 
     @Relation(
         parentColumn = "id",
@@ -38,7 +38,7 @@ data class RecordAndDetail(
         entity = ACCEntity::class,
         projection = ["x"]
     )
-    val accXList: List<Int>?,
+    val accXList: List<Int> = listOf(),
 
     @Relation(
         parentColumn = "id",
@@ -46,7 +46,7 @@ data class RecordAndDetail(
         entity = ACCEntity::class,
         projection = ["y"]
     )
-    val accYList: List<Int>?,
+    val accYList: List<Int> = listOf(),
 
     @Relation(
         parentColumn = "id",
@@ -54,7 +54,7 @@ data class RecordAndDetail(
         entity = ACCEntity::class,
         projection = ["z"]
     )
-    val accZList: List<Int>?,
+    val accZList: List<Int> = listOf(),
 
 
-)
+    )

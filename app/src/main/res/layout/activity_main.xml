@@ -29,10 +29,10 @@
                 android:id="@+id/edt_device"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="textCapCharacters"
-                android:textAllCaps="true"
-                android:nextFocusDown="@id/switch_connect"
                 android:imeOptions="actionGo"
+                android:inputType="textCapCharacters"
+                android:nextFocusDown="@id/switch_connect"
+                android:textAllCaps="true"
                 android:textSize="18dp" />
         </com.google.android.material.textfield.TextInputLayout>
 
@@ -402,6 +402,7 @@
             app:layout_constraintTop_toBottomOf="@id/panel_content"
             tools:checked="true" />
 
+
         <Button
             android:id="@+id/btn_download"
             android:layout_width="wrap_content"
@@ -409,7 +410,7 @@
             android:layout_marginTop="16dp"
             android:enabled="true"
             android:text="下載資料"
-            android:textSize="30sp"
+            android:textSize="26sp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/switch_record" />
@@ -420,6 +421,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
+            android:backgroundTint="@android:color/darker_gray"
             android:enabled="false"
             android:text="清除資料"
             android:textSize="10sp"
@@ -428,12 +430,18 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/btn_download" />
 
-        <androidx.constraintlayout.widget.Group
-            android:id="@+id/group_record"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:visibility="visible"
-            app:constraint_referenced_ids="btn_download,btn_clear,switch_record"
+        <ProgressBar
+            android:id="@+id/progress_loading"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:elevation="4dp"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="@id/panel_content"
+            app:layout_constraintDimensionRatio="1:1"
+            app:layout_constraintEnd_toEndOf="@id/panel_content"
+            app:layout_constraintStart_toStartOf="@id/panel_content"
+            app:layout_constraintTop_toTopOf="@id/panel_content"
+            app:layout_constraintWidth_percent="0.3"
             tools:visibility="visible" />
 
 
