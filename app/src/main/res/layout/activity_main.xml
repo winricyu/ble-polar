@@ -462,6 +462,15 @@
             app:constraint_referenced_ids="progress_loading,tv_loading"
             tools:visibility="visible" />
 
+        <TextView
+            android:id="@+id/tv_version"
+            tools:text="v1.0.3"
+            android:padding="8dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 

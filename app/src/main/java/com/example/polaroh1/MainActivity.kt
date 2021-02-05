@@ -438,11 +438,11 @@ class MainActivity : AppCompatActivity() {
                 super.blePowerStateChanged(powered)
                 println("ericyu - MainActivity.blePowerStateChanged, powered = [${powered}]")
                 switch_connect.isEnabled = powered
-                Toast.makeText(
+                /*Toast.makeText(
                     this@MainActivity,
                     "藍芽 ${if (powered) "ON" else "OFF"}",
                     Toast.LENGTH_SHORT
-                ).show()
+                ).show()*/
 
             }
 
@@ -728,6 +728,8 @@ class MainActivity : AppCompatActivity() {
         mSharedPreferences.getString(DEVICE_ID, "")?.takeIf { !it.isNullOrBlank() }?.run {
             edt_device.setText(this)
         }
+
+        tv_version.text = "v${BuildConfig.VERSION_NAME}"
 
     }
 
