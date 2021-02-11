@@ -29,4 +29,8 @@ interface RecordDao {
     @Query("SELECT * FROM RECORD")
     fun queryRecordAndDetailAsync():LiveData<List<RecordAndDetail>>
 
+    @Transaction
+    @Query("SELECT * FROM RECORD")
+    fun queryRecordAndDetail():List<RecordAndDetail>
+
 }

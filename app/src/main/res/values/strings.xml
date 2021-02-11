@@ -1,9 +1,5 @@
 <resources>
     <string name="app_name">PolarOH1</string>
-    <string name="title_activity_main">MainActivity</string>
-    <!--
-    This string is used for square devices and overridden by hello_world in
-    values-round/strings.xml for round devices.
-    -->
-    <string name="hello_world">Hello Square World!</string>
+    <string name="records_log">共 %1$d 筆記錄，斷線次數 %2$d 次</string>
+    <string name="empty_records">無記錄資料</string>
 </resources>

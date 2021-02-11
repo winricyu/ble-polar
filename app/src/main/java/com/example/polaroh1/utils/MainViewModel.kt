@@ -16,6 +16,7 @@ class MainViewModel(private val mContext: Application) : AndroidViewModel(mConte
     val currentPPGList: MutableLiveData<MutableList<PPGEntity>> = MutableLiveData(mutableListOf())
     val currentPPIList: MutableLiveData<MutableList<PPIEntity>> = MutableLiveData(mutableListOf())
     val currentACCList: MutableLiveData<MutableList<ACCEntity>> = MutableLiveData(mutableListOf())
+    val deviceDisconnectCounts: MutableLiveData<MutableList<Int>> = MutableLiveData(mutableListOf())
     val polarApi: PolarBleApi by lazy {
         PolarBleApiDefaultImpl.defaultImplementation(
             mContext,
@@ -27,6 +28,7 @@ class MainViewModel(private val mContext: Application) : AndroidViewModel(mConte
         currentPPGList.value?.clear()
         currentPPIList.value?.clear()
         currentACCList.value?.clear()
+        deviceDisconnectCounts.value?.clear()
     }
 }
 

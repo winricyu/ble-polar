@@ -78,7 +78,6 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var mCollectDataJob: Job
 
-
     private fun getPackageInstallSource(packageName: String): String? {
         return try {
             packageManager.getInstallerPackageName(packageName)
@@ -91,6 +90,23 @@ class MainActivity : AppCompatActivity() {
             null
         }
 
+    }
+
+    private fun analyzeRecords() {
+        lifecycleScope.launch(Dispatchers.IO) {
+
+            RepositoryKit.queryAllRecords().run {
+
+                runOnUiThread {
+                    tv_record_log.text = getString(
+                        R.string.records_log,
+                        this.size,
+                        mViewModel.deviceDisconnectCounts.value?.size ?: 0
+                    )
+
+                }
+            }
+        }
     }
 
     private suspend fun insertHRList(recordId: Long) {
@@ -161,38 +177,7 @@ class MainActivity : AppCompatActivity() {
                         println("MainActivity.initCollectDataJob runBlocking mDataLock:$mDataLock")
                     }
                     mDataLock = false
-//                    val sb = StringBuilder()
-//                    sb.append("ericyu - MainActivity.repeat $repeatCount, ")
-                    //TODO 每秒收集HR, PPG, PPI, ACC 暫存資料寫入DB
 
-                    /* mViewModel.currentHRList.value?.run {
-                         sb.append("HR:${this.size}, ")
-                         RepositoryKit.insertHRList(*this.asSequence().onEach {
-                             it.recordId = recordId
-                         }.toList().toTypedArray())
-                         this.clear()
-                     }*/
-                    /*mViewModel.currentPPGList.value?.run {
-                        sb.append("PPG:${this.size}, ")
-                        RepositoryKit.insertPPGList(*this.asSequence().onEach {
-                            it.recordId = recordId
-                        }.toList().toTypedArray())
-                        this.clear()
-                    }*/
-                    /*mViewModel.currentPPIList.value?.run {
-                        sb.append("PPI:${this.size}, ")
-                        RepositoryKit.insertPPIList(*this.asSequence().onEach {
-                            it.recordId = recordId
-                        }.toList().toTypedArray())
-                        this.clear()
-                    }*/
-                    /*mViewModel.currentACCList.value?.run {
-                        sb.append("ACC:${this.size}")
-                        RepositoryKit.insertACCList(*this.asSequence().onEach {
-                            it.recordId = recordId
-                        }.toList().toTypedArray())
-                        this.clear()
-                    }*/
                     delay(1000)
                 }
 
@@ -202,51 +187,6 @@ class MainActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-
-
-        /*
-        //TODO 開啟APP安裝來源
-//        val WECHAT = "com.tencent.mm"
-//        val DYACO = "com.dyaco.xinglv"
-//        val QIYI = "com.qiyi.video"
-//        val SNAPCHAT = "com.snapchat.android"
-        val launchAppStore = View.OnClickListener {
-            (it as TextView).text?.toString()?.let { installedApp ->
-
-                getPackageInstallSource(installedApp).let { source ->
-
-                    when {
-
-                        source.isNullOrBlank().not() -> {
-                            //TODO 用安裝來源AppStore開啟的App頁面
-                            startActivity(Intent().apply {
-                                action = Intent.ACTION_VIEW
-                                `package` = "$source"
-                                data = Uri.parse("market://details?id=$installedApp")
-                            })
-                        }
-                        else -> {
-                            //TODO 開啟任意 App Store
-                            Toast.makeText(this, "找不到安裝來源", Toast.LENGTH_SHORT).show()
-                            startActivity(Intent().apply {
-                                action = Intent.ACTION_VIEW
-                                data = Uri.parse("market://details?id=$installedApp")
-                            })
-
-                        }
-
-                    }
-
-
-                }
-            }
-        }
-
-
-        btn_1.setOnClickListener(launchAppStore)
-        btn_2.setOnClickListener(launchAppStore)
-        btn_3.setOnClickListener(launchAppStore)*/
-
 
         //處理裝置連線狀態
         mPolarStatus.observe(this) { status ->
@@ -367,17 +307,24 @@ class MainActivity : AppCompatActivity() {
             if (isChecked) {
                 initCollectDataJob()
                 mCollectDataJob.start()
+
             } else {
                 mCollectDataJob.cancel()
-
             }
 
         }
 
         mRecording.observe(this) { recording ->
-            //TODO 測試下載
             btn_download.isEnabled = !recording
             btn_clear.isEnabled = !recording
+            //tv_record_log.isVisible = !recording
+
+            //TODO 分析並顯示資料
+            if (recording) {
+                tv_record_log.text="記錄中..."
+            }else{
+                analyzeRecords()
+            }
         }
 
         //輸入框
@@ -395,6 +342,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         btn_clear.setOnClickListener {
+            throw RuntimeException("Test Crash~")
             lifecycleScope.launch {
                 AlertDialog.Builder(this@MainActivity)
                     .setTitle("警告")
@@ -464,6 +412,7 @@ class MainActivity : AppCompatActivity() {
                 super.deviceDisconnected(polarDeviceInfo)
                 println("ericyu - MainActivity.deviceDisconnected, polarDeviceInfo = [${polarDeviceInfo}]")
                 mDeviceId = ""
+                mViewModel.deviceDisconnectCounts.value?.add(1)
                 mPPGDisposable?.dispose()
                 mPPIDisposable?.dispose()
                 mACCDisposable?.dispose()
@@ -731,6 +680,11 @@ class MainActivity : AppCompatActivity() {
 
         tv_version.text = "v${BuildConfig.VERSION_NAME}"
 
+        //預設狀態
+//        btn_download.isEnabled = false
+//        btn_clear.isEnabled = false
+        analyzeRecords()
+
     }
 
     override fun onRequestPermissionsResult(
@@ -759,17 +713,21 @@ class MainActivity : AppCompatActivity() {
         tv_ppg_value.text = "--"
         tv_ppi_value.text = "--"
         tv_acc_value.text = "--"
+        tv_record_log.text = getString(R.string.records_log, 0, 0)
     }
 
     private fun downloadFile() {
 
         lifecycleScope.launch(Dispatchers.Main) {
             group_loading.isVisible = true
-            RepositoryKit.queryRecordAndDetailAsync().observe(this@MainActivity) {
-                println("ericyu - MainActivity.downloadFile, result:${it.size}")
+            RepositoryKit.queryRecordAndDetailAsync().apply {
+                observe(this@MainActivity) {
+                    println("ericyu - MainActivity.downloadFile, result:${it.size}")
+                    removeObservers(this@MainActivity)
 
-                runBlocking {
-                    writeToCSV(it)
+                    runBlocking {
+                        writeToCSV(it)
+                    }
                 }
             }
         }
