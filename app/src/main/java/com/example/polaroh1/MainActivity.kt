@@ -24,6 +24,7 @@ import com.example.polaroh1.repository.entity.*
 import com.example.polaroh1.utils.MainViewModel
 import com.example.polaroh1.utils.MainViewModelFactory
 import com.github.doyaaaaaken.kotlincsv.dsl.csvWriter
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import io.reactivex.rxjava3.disposables.Disposable
 import io.reactivex.rxjava3.functions.Function
 import io.reactivex.rxjava3.schedulers.Schedulers
@@ -46,7 +47,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private val mViewModel by lazy {
-//        ViewModelProvider(this).get(MainViewModel::class.java)
         ViewModelProvider(this, mViewModelFactory).get(MainViewModel::class.java)
 
     }
@@ -65,8 +65,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private val mPolarStatus = MutableLiveData<PolarStatus>()
-
-    private var mDeviceId = ""
     private var mRecording = MutableLiveData<Boolean>()
     private var mConnectionStartTime = 0L
 
@@ -77,20 +75,6 @@ class MainActivity : AppCompatActivity() {
     private var mTimer: Timer? = null
 
     private lateinit var mCollectDataJob: Job
-
-    private fun getPackageInstallSource(packageName: String): String? {
-        return try {
-            packageManager.getInstallerPackageName(packageName)
-//            packageManager.getInstallSourceInfo(packageName).originatingPackageName
-        } catch (e: NoSuchMethodError) {
-            e.localizedMessage
-            null
-        } catch (e: Exception) {
-            e.localizedMessage
-            null
-        }
-
-    }
 
     private fun analyzeRecords() {
         lifecycleScope.launch(Dispatchers.IO) {
@@ -123,7 +107,6 @@ class MainActivity : AppCompatActivity() {
     private suspend fun insertPPGList(recordId: Long) {
         println("MainActivity.insertPPGList , recordId = [${recordId}]")
         mViewModel.currentPPGList.value?.run {
-//            sb.append("PPG:${this.size}, ")
             RepositoryKit.insertPPGList(*this.asSequence().onEach {
                 it.recordId = recordId
             }.toList().toTypedArray())
@@ -134,7 +117,6 @@ class MainActivity : AppCompatActivity() {
     private suspend fun insertPPIList(recordId: Long) {
         println("MainActivity.insertPPIList , recordId = [${recordId}]")
         mViewModel.currentPPIList.value?.run {
-            //sb.append("PPI:${this.size}, ")
             RepositoryKit.insertPPIList(*this.asSequence().onEach {
                 it.recordId = recordId
             }.toList().toTypedArray())
@@ -145,7 +127,6 @@ class MainActivity : AppCompatActivity() {
     private suspend fun insertACCList(recordId: Long) {
         println("MainActivity.insertACCList , recordId = [${recordId}]")
         mViewModel.currentACCList.value?.run {
-            //sb.append("ACC:${this.size}")
             RepositoryKit.insertACCList(*this.asSequence().onEach {
                 it.recordId = recordId
             }.toList().toTypedArray())
@@ -207,7 +188,6 @@ class MainActivity : AppCompatActivity() {
                 }
                 PolarStatus.CONNECTING -> {
                     switch_connect.text = "連線中..."
-                    tv_device_id.text = mDeviceId
                     mConnectionStartTime = 0
                 }
                 PolarStatus.CONNECTED -> {
@@ -228,7 +208,6 @@ class MainActivity : AppCompatActivity() {
                     }
                     switch_connect.text = "已連線"
                     mConnectionStartTime = SystemClock.elapsedRealtime()
-                    tv_device_id.text = mDeviceId
 
                 }
                 PolarStatus.FAIL -> {
@@ -255,6 +234,13 @@ class MainActivity : AppCompatActivity() {
         mViewModel.currentACCList.observe(this) { list ->
             tv_acc_value.text = "${list.size}"
         }
+        mViewModel.deviceId.observe(this) {
+            if (it.isNotBlank()) {
+                FirebaseCrashlytics.getInstance().setCustomKey("DeviceId", it)
+            }
+
+            tv_device_id.text = if(it.isBlank()) "--------" else it
+        }
 
 
         //連接Polar裝置
@@ -265,19 +251,7 @@ class MainActivity : AppCompatActivity() {
 
                 val deviceId = edt_device.text?.trim().toString()
 
-                /*if (deviceId.isBlank()) {
-                    mPolarStatus.value = PolarStatus.SEARCHING
-                    mViewModel.mPolarApi.autoConnectToDevice(-50, "180D", null).subscribe(
-                        {
-                            println("ericyu - auto connect search complete")
-                        },
-                        {
-                            println("ericyu - throwable: $it")
-                            mPolarStatus.value = PolarStatus.FAIL
-                        }
-                    )
 
-                } else {*/
                 if (deviceId.isBlank() or (deviceId.length < MAX_LENGTH)) {
                     input_layout.error = "請輸入 Device ID 共 $MAX_LENGTH 碼"
                     switch.isChecked = !isChecked
@@ -290,9 +264,10 @@ class MainActivity : AppCompatActivity() {
 //                }
 
             } else {
-                if (mDeviceId.isNotBlank()) {
-                    mViewModel.polarApi.disconnectFromDevice(mDeviceId)
+                mViewModel.deviceId.value?.takeIf { it.isNotBlank() }?.run {
+                    mViewModel.polarApi.disconnectFromDevice(this)
                 }
+
                 switch_record.isChecked = false
                 progress_connection.isVisible = false
                 mViewModel.polarApi.cleanup()
@@ -321,8 +296,8 @@ class MainActivity : AppCompatActivity() {
 
             //TODO 分析並顯示資料
             if (recording) {
-                tv_record_log.text="記錄中..."
-            }else{
+                tv_record_log.text = "記錄中..."
+            } else {
                 analyzeRecords()
             }
         }
@@ -342,7 +317,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         btn_clear.setOnClickListener {
-            throw RuntimeException("Test Crash~")
             lifecycleScope.launch {
                 AlertDialog.Builder(this@MainActivity)
                     .setTitle("警告")
@@ -397,7 +371,7 @@ class MainActivity : AppCompatActivity() {
             override fun deviceConnected(polarDeviceInfo: PolarDeviceInfo) {
                 super.deviceConnected(polarDeviceInfo)
                 println("ericyu - MainActivity.deviceConnected, polarDeviceInfo = [${polarDeviceInfo}]")
-                mDeviceId = polarDeviceInfo.deviceId
+                mViewModel.deviceId.value = polarDeviceInfo.deviceId
                 mSharedPreferences.edit().putString(DEVICE_ID, polarDeviceInfo.deviceId).apply()
                 mPolarStatus.value = PolarStatus.CONNECTED
             }
@@ -411,7 +385,7 @@ class MainActivity : AppCompatActivity() {
             override fun deviceDisconnected(polarDeviceInfo: PolarDeviceInfo) {
                 super.deviceDisconnected(polarDeviceInfo)
                 println("ericyu - MainActivity.deviceDisconnected, polarDeviceInfo = [${polarDeviceInfo}]")
-                mDeviceId = ""
+                mViewModel.deviceId.value = ""
                 mViewModel.deviceDisconnectCounts.value?.add(1)
                 mPPGDisposable?.dispose()
                 mPPIDisposable?.dispose()
@@ -675,6 +649,7 @@ class MainActivity : AppCompatActivity() {
 
         //取得暫存device id
         mSharedPreferences.getString(DEVICE_ID, "")?.takeIf { !it.isNullOrBlank() }?.run {
+            FirebaseCrashlytics.getInstance().setCustomKey("DeviceId", this)
             edt_device.setText(this)
         }
 
@@ -779,7 +754,7 @@ class MainActivity : AppCompatActivity() {
 //                        val createDate = createtime.split(" ").firstOrNull() ?: ""
                         putExtra(
                             Intent.EXTRA_SUBJECT,
-                            "PolarOH1 [$mDeviceId] ${
+                            "PolarOH1 [${mViewModel.deviceId.value?:""}] ${
                                 createtime.split(" ").firstOrNull() ?: ""
                             } 追蹤紀錄"
                         )
