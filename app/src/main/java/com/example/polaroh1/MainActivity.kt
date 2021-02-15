@@ -195,13 +195,17 @@ class MainActivity : AppCompatActivity() {
                     mTimer = Timer("connection_timer").apply {
                         schedule(object : TimerTask() {
                             override fun run() {
-                                tv_device_info.text =
-                                    "連線時間: ${
-                                        SimpleDateFormat("HH:mm:ss").apply {
-                                            timeZone = TimeZone.getTimeZone("UTC")
-                                        }
-                                            .format(Date(SystemClock.elapsedRealtime() - mConnectionStartTime))
-                                    }"
+
+                                lifecycleScope.launch(Dispatchers.Main) {
+
+                                    tv_device_info.text =
+                                        "連線時間: ${
+                                            SimpleDateFormat("HH:mm:ss").apply {
+                                                timeZone = TimeZone.getTimeZone("UTC")
+                                            }
+                                                .format(Date(SystemClock.elapsedRealtime() - mConnectionStartTime))
+                                        }"
+                                }
                             }
 
                         }, 0, 1000)
@@ -239,7 +243,7 @@ class MainActivity : AppCompatActivity() {
                 FirebaseCrashlytics.getInstance().setCustomKey("DeviceId", it)
             }
 
-            tv_device_id.text = if(it.isBlank()) "--------" else it
+            tv_device_id.text = if (it.isBlank()) "--------" else it
         }
 
 
@@ -689,17 +693,28 @@ class MainActivity : AppCompatActivity() {
         tv_ppi_value.text = "--"
         tv_acc_value.text = "--"
         tv_record_log.text = getString(R.string.records_log, 0, 0)
+        progress_loading.progress = 0
+        progress_loading.max = 0
     }
 
     private fun downloadFile() {
 
         lifecycleScope.launch(Dispatchers.Main) {
             group_loading.isVisible = true
+            progress_loading.progress = 0
+            progress_loading.max = 0
+            tv_loading.text = "處理中"
+            repeat(3) {
+                delay(1000)
+                tv_loading.text = "${tv_loading.text}."
+            }
+
             RepositoryKit.queryRecordAndDetailAsync().apply {
                 observe(this@MainActivity) {
                     println("ericyu - MainActivity.downloadFile, result:${it.size}")
                     removeObservers(this@MainActivity)
-
+                    //TODO 設定 loading progress max
+                    progress_loading.max = it.size
                     runBlocking {
                         writeToCSV(it)
                     }
@@ -723,7 +738,7 @@ class MainActivity : AppCompatActivity() {
             csvWriter().openAsync(file) {
                 writeRow(listOf("id", "timestamp", "hr", "ppg", "ppi", "x", "y", "z"))
 
-                list.onEach { detail ->
+                list.onEachIndexed { index, detail ->
 
                     writeRow(
                         listOf(
@@ -737,6 +752,11 @@ class MainActivity : AppCompatActivity() {
                             "[${detail.accZList.joinToString()}]"
                         )
                     )
+                    //TODO 顯示處理進度
+                    withContext(Dispatchers.Main) {
+                        progress_loading.progress = index + 1
+                        tv_loading.text = "${progress_loading.progress}/${progress_loading.max}"
+                    }
                 }
             }
 
@@ -754,7 +774,7 @@ class MainActivity : AppCompatActivity() {
 //                        val createDate = createtime.split(" ").firstOrNull() ?: ""
                         putExtra(
                             Intent.EXTRA_SUBJECT,
-                            "PolarOH1 [${mViewModel.deviceId.value?:""}] ${
+                            "PolarOH1 [${mViewModel.deviceId.value ?: ""}] ${
                                 createtime.split(" ").firstOrNull() ?: ""
                             } 追蹤紀錄"
                         )
