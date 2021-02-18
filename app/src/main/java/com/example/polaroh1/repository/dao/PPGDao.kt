@@ -15,6 +15,9 @@ interface PPGDao {
     @Delete
     fun delete(data: PPGEntity)
 
+    @Query("DELETE FROM PPG")
+    fun deleteAll():Int
+
     @Query("SELECT * FROM PPG")
     fun queryAll():List<PPGEntity>
 }

@@ -14,12 +14,20 @@ object RepositoryKit {
             Room.databaseBuilder(context, DatabaseManager::class.java, "PolarDB").build()
     }
 
+    suspend fun insertHR(hrEntity: HREntity) {
+        databaseManager.getHRDao().insert(hrEntity)
+    }
+
     suspend fun insertACC(accEntity: ACCEntity) {
         databaseManager.getACCDao().insert(accEntity)
     }
 
-    suspend fun insertHR(hrEntity: HREntity) {
-        databaseManager.getHRDao().insert(hrEntity)
+    suspend fun insertPPG(ppgEntity: PPGEntity) {
+        databaseManager.getPPGDao().insert(ppgEntity)
+    }
+
+    suspend fun insertPPI(ppiEntity: PPIEntity) {
+        databaseManager.getPPIDao().insert(ppiEntity)
     }
 
     suspend fun insertHRList(vararg samples: HREntity) {
@@ -54,6 +62,15 @@ object RepositoryKit {
     suspend fun clearAllTables() {
         println("ericyu - RepositoryKit.clearAllData")
         databaseManager.clearAllTables()
+    }
+
+    suspend fun clearAllTableEntries(){
+        println("ericyu - RepositoryKit.clearAllTableEntries")
+        println("getRecordDao().deleteAll: ${databaseManager.getRecordDao().deleteAll()}")
+        println("getHRDao().deleteAll: ${databaseManager.getHRDao().deleteAll()}")
+        println("getPPIDao().deleteAll: ${databaseManager.getPPIDao().deleteAll()}")
+        println("getPPGDao().deleteAll: ${databaseManager.getPPGDao().deleteAll()}")
+        println("getACCDao().deleteAll: ${databaseManager.getACCDao().deleteAll()}")
     }
 
 }

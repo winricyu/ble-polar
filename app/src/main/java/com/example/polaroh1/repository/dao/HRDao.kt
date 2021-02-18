@@ -15,6 +15,9 @@ interface HRDao {
     @Delete
     fun delete(data: HREntity)
 
+    @Query("DELETE FROM HR")
+    fun deleteAll():Int
+
     @Query("SELECT * FROM HR")
     fun queryAll():List<HREntity>
 }

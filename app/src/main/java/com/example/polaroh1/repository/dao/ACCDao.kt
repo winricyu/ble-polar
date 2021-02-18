@@ -16,6 +16,9 @@ interface ACCDao {
     @Delete
     fun delete(data: ACCEntity)
 
+    @Query("DELETE FROM ACC")
+    fun deleteAll():Int
+
     @Query("SELECT * FROM ACC")
     fun queryAll():List<ACCEntity>
 

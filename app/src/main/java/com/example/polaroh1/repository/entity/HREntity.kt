@@ -14,7 +14,6 @@ data class HREntity(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
     var recordId: Long = 0,
-    val timestamp: Date = Date(0),
     val index: Int = 0,
     val hr: Int = 0,
     val rrs: List<Int> = listOf(),

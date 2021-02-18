@@ -17,13 +17,13 @@ data class PPGEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
     var recordId: Long = 0,
-    val timestamp: Date,
+    val timestamp: Date = Date(0),
     val index: Int = 0,
     val ppg0: Int = 0,
     val ppg1: Int = 0,
     val ppg2: Int = 0,
     val ambient: Int = 0,
-    val ppgDataSamples: List<Int>,
+    val ppgDataSamples: List<Int> = listOf(),
     val ambient2: Int = 0,
     val status: Long = 0,
 )

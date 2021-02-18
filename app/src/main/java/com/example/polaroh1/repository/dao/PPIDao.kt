@@ -15,6 +15,9 @@ interface PPIDao {
     @Delete
     fun delete(ppiEntity: PPIEntity)
 
+    @Query("DELETE FROM PPI")
+    fun deleteAll():Int
+
     @Query("SELECT * FROM PPI")
     fun queryAll(): List<PPIEntity>
 }
