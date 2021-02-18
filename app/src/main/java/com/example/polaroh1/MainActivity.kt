@@ -759,17 +759,15 @@ class MainActivity : AppCompatActivity() {
                 FileProvider.getUriForFile(this@MainActivity, "polaroh1.fileprovider", file)
 
             csvWriter().openAsync(file) {
-                writeRow(listOf("id", "timestamp", "hr", "ppg", "ppi", "x", "y", "z"))
+                writeRow(listOf("TIMESTAMP", "HR", "PPG", "ACC_X", "ACC_Y", "ACC_Z"))
 
                 list.onEachIndexed { index, detail ->
 
                     writeRow(
                         listOf(
-                            detail.record.id,
-                            detail.record.timestamp,
+                            detail.record.timestamp.time,
                             "[${detail.hrList.joinToString()}]",
                             "[${detail.ppgList.joinToString()}]",
-                            "[${detail.ppiList.joinToString()}]",
                             "[${detail.accXList.joinToString()}]",
                             "[${detail.accYList.joinToString()}]",
                             "[${detail.accZList.joinToString()}]"
