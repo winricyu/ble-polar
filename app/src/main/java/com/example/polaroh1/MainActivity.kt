@@ -35,6 +35,8 @@ import polar.com.sdk.api.PolarBleApiCallback
 import polar.com.sdk.api.model.*
 import java.io.File
 import java.text.SimpleDateFormat
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 import java.util.*
 
 
@@ -96,7 +98,13 @@ class MainActivity : AppCompatActivity() {
     private suspend fun insertHRList(recordId: Long) {
         println("MainActivity.insertHRList , recordId = [${recordId}]")
         mViewModel.currentHRList.value?.run {
-//            sb.append("HR:${this.size}, ")
+            //無資料時寫入空值
+            if (isEmpty()) {
+                RepositoryKit.insertHR(HREntity(recordId = recordId))
+                return@run
+            }
+
+
             RepositoryKit.insertHRList(*this.asSequence().onEach {
                 it.recordId = recordId
             }.toList().toTypedArray())
@@ -107,7 +115,12 @@ class MainActivity : AppCompatActivity() {
     private suspend fun insertPPGList(recordId: Long) {
         println("MainActivity.insertPPGList , recordId = [${recordId}]")
         mViewModel.currentPPGList.value?.run {
-            RepositoryKit.insertPPGList(*this.asSequence().onEach {
+            //無資料時寫入空值
+            if (isEmpty()) {
+                RepositoryKit.insertPPG(PPGEntity(recordId = recordId))
+                return@run
+            }
+            RepositoryKit.insertPPGList(*this.asSequence().onEachIndexed { index, it ->
                 it.recordId = recordId
             }.toList().toTypedArray())
             this.clear()
@@ -117,6 +130,11 @@ class MainActivity : AppCompatActivity() {
     private suspend fun insertPPIList(recordId: Long) {
         println("MainActivity.insertPPIList , recordId = [${recordId}]")
         mViewModel.currentPPIList.value?.run {
+            //無資料時寫入空值
+            if (isEmpty()) {
+                RepositoryKit.insertPPI(PPIEntity(recordId = recordId))
+                return@run
+            }
             RepositoryKit.insertPPIList(*this.asSequence().onEach {
                 it.recordId = recordId
             }.toList().toTypedArray())
@@ -127,6 +145,11 @@ class MainActivity : AppCompatActivity() {
     private suspend fun insertACCList(recordId: Long) {
         println("MainActivity.insertACCList , recordId = [${recordId}]")
         mViewModel.currentACCList.value?.run {
+            //無資料時寫入空值
+            if (isEmpty()) {
+                RepositoryKit.insertACC(ACCEntity(recordId = recordId))
+                return@run
+            }
             RepositoryKit.insertACCList(*this.asSequence().onEach {
                 it.recordId = recordId
             }.toList().toTypedArray())
