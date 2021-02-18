@@ -163,21 +163,22 @@ class MainActivity : AppCompatActivity() {
 
                 //Polar OH1 可使用12小時
                 repeat(43200) { repeatCount ->
-
+                    val timestamp = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC)
                     val recordId =
-                        RepositoryKit.insertRecord(RecordEntity(timestamp = Date(System.currentTimeMillis())))
+                        RepositoryKit.insertRecord(RecordEntity(timestamp = Date(timestamp)))
 
                     runBlocking {
                         mDataLock = true
                         println("MainActivity.initCollectDataJob runBlocking 1 mDataLock:$mDataLock")
                         val hr = async { insertHRList(recordId) }
-                        hr.await()
+//                        hr.await()
                         val ppg = async { insertPPGList(recordId) }
-                        ppg.await()
+//                        ppg.await()
                         val ppi = async { insertPPIList(recordId) }
-                        ppi.await()
+//                        ppi.await()
                         val acc = async { insertACCList(recordId) }
-                        acc.await()
+//                        acc.await()
+                        awaitAll(hr, ppg, ppi, acc)
                         println("MainActivity.initCollectDataJob runBlocking mDataLock:$mDataLock")
                     }
                     mDataLock = false
@@ -192,12 +193,13 @@ class MainActivity : AppCompatActivity() {
         super.onStart()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
+
         //處理裝置連線狀態
         mPolarStatus.observe(this) { status ->
             println("ericyu - MainActivity.mPolarStatus: $status")
-            //switch_record.isVisible = status == PolarStatus.CONNECTED
             progress_connection.isVisible =
                 (status == PolarStatus.CONNECTING) or (status == PolarStatus.SEARCHING)
+            switch_connect.setTextColor(getColor(if (status == PolarStatus.DISCONNECTED) R.color.error else android.R.color.black))
 
             when (status) {
                 PolarStatus.IDLE -> {
@@ -218,9 +220,7 @@ class MainActivity : AppCompatActivity() {
                     mTimer = Timer("connection_timer").apply {
                         schedule(object : TimerTask() {
                             override fun run() {
-
                                 lifecycleScope.launch(Dispatchers.Main) {
-
                                     tv_device_info.text =
                                         "連線時間: ${
                                             SimpleDateFormat("HH:mm:ss").apply {
@@ -230,7 +230,6 @@ class MainActivity : AppCompatActivity() {
                                         }"
                                 }
                             }
-
                         }, 0, 1000)
                     }
                     switch_connect.text = "已連線"
@@ -319,9 +318,8 @@ class MainActivity : AppCompatActivity() {
         mRecording.observe(this) { recording ->
             btn_download.isEnabled = !recording
             btn_clear.isEnabled = !recording
-            //tv_record_log.isVisible = !recording
 
-            //TODO 分析並顯示資料
+            //顯示紀錄狀態或資料筆數
             if (recording) {
                 tv_record_log.text = "記錄中..."
             } else {
@@ -428,7 +426,7 @@ class MainActivity : AppCompatActivity() {
             override fun accelerometerFeatureReady(identifier: String) {
                 super.accelerometerFeatureReady(identifier)
                 println("ericyu - MainActivity.accelerometerFeatureReady, identifier = [${identifier}]")
-                //TODO 取得ACC
+                //取得ACC
                 tv_acc_value.text = "Ready..."
                 mACCDisposable = mViewModel.polarApi.requestAccSettings(identifier)
                     .toFlowable()
@@ -479,7 +477,7 @@ class MainActivity : AppCompatActivity() {
             override fun ppgFeatureReady(identifier: String) {
                 super.ppgFeatureReady(identifier)
                 println("ericyu - MainActivity.ppgFeatureReady, identifier = [${identifier}]")
-                //TODO 取得PPG
+                //取得PPG
                 tv_ppg_value.text = "Ready..."
                 mPPGDisposable = mViewModel.polarApi.requestPpgSettings(identifier)
                     .toFlowable()
@@ -511,6 +509,7 @@ class MainActivity : AppCompatActivity() {
                         {
                             //每150ms收到資料
                             println("ericyu - MainActivity.ppg, onRecieved ${it.size}, mDataLock:${mDataLock}")
+
                             if (!switch_record.isChecked) return@subscribe
                             if (mDataLock) return@subscribe
 
@@ -537,9 +536,9 @@ class MainActivity : AppCompatActivity() {
             override fun ppiFeatureReady(identifier: String) {
                 super.ppiFeatureReady(identifier)
                 println("ericyu - MainActivity.ppiFeatureReady, identifier = [${identifier}]")
-                //TODO 取得PPI
+                //取得PPI
                 tv_ppi_value.text = "Ready..."
-                mPPIDisposable = mViewModel.polarApi.startOhrPPIStreaming(identifier)
+                /*mPPIDisposable = mViewModel.polarApi.startOhrPPIStreaming(identifier)
                     .observeOn(Schedulers.io())
                     .map {
                         it.samples.asSequence().mapIndexed { index, sample ->
@@ -569,7 +568,7 @@ class MainActivity : AppCompatActivity() {
                             this.postValue(this.value)
                         }
 
-                    }
+                    }*/
 
             }
 
@@ -599,7 +598,7 @@ class MainActivity : AppCompatActivity() {
             override fun hrNotificationReceived(identifier: String, data: PolarHrData) {
                 super.hrNotificationReceived(identifier, data)
                 println("ericyu - MainActivity.hrNotificationReceived, identifier = [${identifier}], hr = [${data.hr}], mDataLock:${mDataLock}")
-                //TODO 取得HR
+                //取得HR
                 tv_hr_value.text = "${data.hr}"
                 if (!switch_record.isChecked) return
                 if (mDataLock) return
@@ -708,7 +707,8 @@ class MainActivity : AppCompatActivity() {
     //清除資料庫和暫存
     private fun clearCacheAndDatabase() {
         lifecycleScope.launch(context = Dispatchers.IO) {
-            RepositoryKit.clearAllTables()
+            //RepositoryKit.clearAllTables()
+            RepositoryKit.clearAllTableEntries()
         }
         mViewModel.clearData()
         tv_hr_value.text = "--"
@@ -716,16 +716,16 @@ class MainActivity : AppCompatActivity() {
         tv_ppi_value.text = "--"
         tv_acc_value.text = "--"
         tv_record_log.text = getString(R.string.records_log, 0, 0)
-        progress_loading.progress = 0
-        progress_loading.max = 0
+        progress_file_output.progress = 0
+        progress_file_output.max = 0
     }
 
     private fun downloadFile() {
 
         lifecycleScope.launch(Dispatchers.Main) {
             group_loading.isVisible = true
-            progress_loading.progress = 0
-            progress_loading.max = 0
+            progress_file_output.progress = 0
+            progress_file_output.max = 0
             tv_loading.text = "處理中"
             repeat(3) {
                 delay(1000)
@@ -736,8 +736,8 @@ class MainActivity : AppCompatActivity() {
                 observe(this@MainActivity) {
                     println("ericyu - MainActivity.downloadFile, result:${it.size}")
                     removeObservers(this@MainActivity)
-                    //TODO 設定 loading progress max
-                    progress_loading.max = it.size
+                    //設定 loading progress max
+                    progress_file_output.max = it.size
                     runBlocking {
                         writeToCSV(it)
                     }
@@ -775,10 +775,10 @@ class MainActivity : AppCompatActivity() {
                             "[${detail.accZList.joinToString()}]"
                         )
                     )
-                    //TODO 顯示處理進度
+                    //顯示CSV格式轉換處理進度
                     withContext(Dispatchers.Main) {
-                        progress_loading.progress = index + 1
-                        tv_loading.text = "${progress_loading.progress}/${progress_loading.max}"
+                        progress_file_output.progress = index + 1
+                        tv_loading.text = "${progress_file_output.progress}/${progress_file_output.max}"
                     }
                 }
             }
@@ -792,12 +792,12 @@ class MainActivity : AppCompatActivity() {
                         putExtra(Intent.EXTRA_STREAM, fileUri)
                         val createtime =
                             SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).run {
-                                format(Date(System.currentTimeMillis()))
+                                format(Date(LocalDateTime.now().toEpochSecond(ZoneOffset.UTC)))
                             }
 //                        val createDate = createtime.split(" ").firstOrNull() ?: ""
                         putExtra(
                             Intent.EXTRA_SUBJECT,
-                            "PolarOH1 [${mViewModel.deviceId.value ?: ""}] ${
+                            "PolarOH1 [${edt_device.text.toString() ?: ""}] ${
                                 createtime.split(" ").firstOrNull() ?: ""
                             } 追蹤紀錄"
                         )
