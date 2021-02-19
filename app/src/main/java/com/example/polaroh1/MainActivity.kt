@@ -19,6 +19,9 @@ import androidx.core.widget.addTextChangedListener
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
+import com.bomdic.gomoreedgekit.GoMoreEdgeKit
+import com.bomdic.gomoreedgekit.StressSleepParam
+import com.bomdic.gomoreedgekit.StressSleepResult
 import com.example.polaroh1.repository.RepositoryKit
 import com.example.polaroh1.repository.entity.*
 import com.example.polaroh1.utils.MainViewModel
@@ -103,8 +106,6 @@ class MainActivity : AppCompatActivity() {
                 RepositoryKit.insertHR(HREntity(recordId = recordId))
                 return@run
             }
-
-
             RepositoryKit.insertHRList(*this.asSequence().onEach {
                 it.recordId = recordId
             }.toList().toTypedArray())
@@ -122,9 +123,67 @@ class MainActivity : AppCompatActivity() {
             }
             RepositoryKit.insertPPGList(*this.asSequence().onEachIndexed { index, it ->
                 it.recordId = recordId
+                updateSdkPPGRaw(it.ppg0)
             }.toList().toTypedArray())
             this.clear()
         }
+    }
+
+    private fun getSdkActivityInfo(hr: Int): FloatArray {
+
+        return GoMoreEdgeKit.getActivityInfoExt(
+            intArrayOf(LocalDateTime.now().toEpochSecond(ZoneOffset.UTC).toInt()),
+            floatArrayOf(hr.toFloat())
+        )
+    }
+
+
+    //TODO GoMoreEdgeKit.updatePPGRaw 每秒呼叫, 帶入所有ppg, 回傳result 寫入DB
+    private fun updateSdkPPGRaw(ppg: Int) {
+        if (ppg < 0) return
+
+        //hrArray 首次給空陣列, 之後取 stressSleepResult?.hrArray
+        //rmssdArray 首次給空陣列, 之後取 stressSleepResult?.rmssdArray
+        val hrArr = mViewModel.stressSleepResult.value?.hrArray ?: intArrayOf()
+        val rmssdArr = mViewModel.stressSleepResult.value?.rmssdArray ?: intArrayOf()
+        val updatePPGResult = GoMoreEdgeKit.updatePPGRaw(
+            LocalDateTime.now().toEpochSecond(ZoneOffset.UTC).toInt(),
+            StressSleepParam(
+                ppg.toFloat(),
+                0f,
+                135,
+                floatArrayOf(0f, 0f, 0f),
+                0,
+                hrArr,
+                rmssdArr
+            ),
+            StressSleepResult()
+        )
+
+//        mViewModel.stressSleepResult.value?.apply {
+
+        //TODO 寫入DB
+        updatePPGResult?.also {
+
+            if ((it.hrArray.isEmpty()) or (it.rmssdArray.isEmpty())) {
+                return@also
+            }
+
+            lifecycleScope.launch(Dispatchers.IO) {
+                RepositoryKit.insertSleep(
+                    SleepEntity(
+                        stress = it.stress,
+                        hrArray = it.hrArray.toList(),
+                        ppiArray = it.ppiArray.toList(),
+                        ppiLen = it.ppiLen,
+                        rmssdArray = it.rmssdArray.toList()
+                    )
+                )
+            }
+
+            mViewModel.stressSleepResult.postValue(updatePPGResult)
+        }
+//        }
     }
 
     private suspend fun insertPPIList(recordId: Long) {
@@ -267,6 +326,14 @@ class MainActivity : AppCompatActivity() {
             tv_device_id.text = if (it.isBlank()) "--------" else it
         }
 
+        mViewModel.stressSleepResult.observe(this) {
+            //TODO 列印SDK結果
+            it?.apply {
+                println("stressSleepResult, stress:$stress, ppiArray:${ppiArray.toList()}, ppiLen:$ppiLen")
+                tv_sdk_value.text = "stress:$stress, ppiLen:$ppiLen"
+            }
+        }
+
 
         //連接Polar裝置
         switch_connect.setOnCheckedChangeListener { switch, isChecked ->
@@ -341,6 +408,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         btn_clear.setOnClickListener {
+
             lifecycleScope.launch {
                 AlertDialog.Builder(this@MainActivity)
                     .setTitle("警告")
@@ -602,6 +670,14 @@ class MainActivity : AppCompatActivity() {
                 if (!switch_record.isChecked) return
                 if (mDataLock) return
 
+                //TODO GoMoreEdgeKit.getActivityInfo 每秒呼叫, 取得float array 寫入DB
+                /*GoMoreEdgeKit.getActivityInfo(
+                    intArrayOf(LocalDateTime.now().toEpochSecond(ZoneOffset.UTC).toInt()),
+                    floatArrayOf(data.hr.toFloat())
+                )*/
+
+
+
                 mViewModel.currentHRList.apply {
                     this.value?.add(HREntity(hr = data.hr))
                     this.postValue(this.value)
@@ -642,6 +718,10 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         mWakeLock.acquire(86400000)
+
+        //TODO 測試寫入GoMoreEdgeKit
+        GoMoreEdgeKit.initialize()
+        GoMoreEdgeKit.healthIndexInitUser(mViewModel.userInfo, 1609372799)
 
         when {
             (ContextCompat.checkSelfPermission(
@@ -726,10 +806,11 @@ class MainActivity : AppCompatActivity() {
             progress_file_output.progress = 0
             progress_file_output.max = 0
             tv_loading.text = "處理中"
-            repeat(3) {
+            progress_file_loading.isVisible = true
+            /*repeat(3) {
                 delay(1000)
                 tv_loading.text = "${tv_loading.text}."
-            }
+            }*/
 
             RepositoryKit.queryRecordAndDetailAsync().apply {
                 observe(this@MainActivity) {
@@ -737,6 +818,7 @@ class MainActivity : AppCompatActivity() {
                     removeObservers(this@MainActivity)
                     //設定 loading progress max
                     progress_file_output.max = it.size
+                    progress_file_loading.isVisible = false
                     runBlocking {
                         writeToCSV(it)
                     }
@@ -775,7 +857,8 @@ class MainActivity : AppCompatActivity() {
                     //顯示CSV格式轉換處理進度
                     withContext(Dispatchers.Main) {
                         progress_file_output.progress = index + 1
-                        tv_loading.text = "${progress_file_output.progress}/${progress_file_output.max}"
+                        tv_loading.text =
+                            "${progress_file_output.progress}/${progress_file_output.max}"
                     }
                 }
             }
@@ -810,6 +893,28 @@ class MainActivity : AppCompatActivity() {
 
         }
     }
+
 }
+
+/*
+fun GoMoreEdgeKit.Kit.updatePPGRawExt(
+    currentTime: kotlin.Int,
+    stressSleepParam: com.bomdic.gomoreedgekit.StressSleepParam,
+    stressSleepResult: com.bomdic.gomoreedgekit.StressSleepResult
+): StressSleepResult? {
+
+//    println("ericyu - <top>.updatePPGRawExt, currentTime = [${currentTime}], ppgRaw1 = [${stressSleepParam}], hrArray = [${stressSleepParam.hrArray.size}], rmssdArray = [${stressSleepParam.rmssdArray.size}]")
+    return GoMoreEdgeKit.updatePPGRaw(currentTime, stressSleepParam, stressSleepResult)
+}
+*/
+
+fun GoMoreEdgeKit.Kit.getActivityInfoExt(
+    timestampList: kotlin.IntArray,
+    hrList: kotlin.FloatArray
+): FloatArray {
+    println("ericyu - <top>.getActivityInfoExt, timestampList = ${timestampList.toList()}, hrList = ${hrList.toList()}")
+    return getActivityInfo(timestampList, hrList)
+}
+
 
 

@@ -7,7 +7,12 @@ import com.example.polaroh1.repository.entity.*
 
 @Database(
     entities = [
-        PPGEntity::class, PPIEntity::class, ACCEntity::class, HREntity::class, RecordEntity::class
+        PPGEntity::class,
+        PPIEntity::class,
+        ACCEntity::class,
+        HREntity::class,
+        RecordEntity::class,
+        SleepEntity::class
     ],
     version = 1,
     exportSchema = false
@@ -19,5 +24,6 @@ abstract class DatabaseManager : RoomDatabase() {
     abstract fun getPPIDao(): PPIDao
     abstract fun getACCDao(): ACCDao
     abstract fun getRecordDao(): RecordDao
+    abstract fun getSleepDao(): SleepDao
 
 }

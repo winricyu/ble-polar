@@ -7,7 +7,6 @@ import java.util.*
 
 @Entity(tableName = "HR")
 @TypeConverters(
-    DateConverter::class,
     IntListConverter::class
 )
 data class HREntity(

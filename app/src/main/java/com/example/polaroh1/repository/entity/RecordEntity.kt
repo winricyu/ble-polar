@@ -14,6 +14,5 @@ import java.util.*
 data class RecordEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
-    @ColumnInfo(name = "TIMESTAMP")
     val timestamp: Date = Date(0)
 )

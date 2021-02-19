@@ -30,6 +30,10 @@ object RepositoryKit {
         databaseManager.getPPIDao().insert(ppiEntity)
     }
 
+    suspend fun insertSleep(sleepEntity: SleepEntity) {
+        databaseManager.getSleepDao().insert(sleepEntity)
+    }
+
     suspend fun insertHRList(vararg samples: HREntity) {
         databaseManager.getHRDao().insertAll(*samples)
     }
@@ -71,6 +75,7 @@ object RepositoryKit {
         println("getPPIDao().deleteAll: ${databaseManager.getPPIDao().deleteAll()}")
         println("getPPGDao().deleteAll: ${databaseManager.getPPGDao().deleteAll()}")
         println("getACCDao().deleteAll: ${databaseManager.getACCDao().deleteAll()}")
+        println("getACCDao().deleteAll: ${databaseManager.getSleepDao().deleteAll()}")
     }
 
 }

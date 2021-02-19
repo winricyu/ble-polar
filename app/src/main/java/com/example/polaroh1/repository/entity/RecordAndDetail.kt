@@ -24,13 +24,13 @@ data class RecordAndDetail(
     )
     val ppgList: List<Int> = listOf(),
 
-    @Relation(
+    /*@Relation(
         parentColumn = "id",
         entityColumn = "recordId",
         entity = PPIEntity::class,
         projection = ["ppi"]
     )
-    val ppiList: List<Int> = listOf(),
+    val ppiList: List<Int> = listOf(),*/
 
     @Relation(
         parentColumn = "id",
