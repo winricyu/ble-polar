@@ -171,14 +171,13 @@ class MainActivity : AppCompatActivity() {
                         mDataLock = true
                         println("MainActivity.initCollectDataJob runBlocking 1 mDataLock:$mDataLock")
                         val hr = async { insertHRList(recordId) }
-//                        hr.await()
+                        hr.await()
                         val ppg = async { insertPPGList(recordId) }
-//                        ppg.await()
+                        ppg.await()
                         val ppi = async { insertPPIList(recordId) }
-//                        ppi.await()
+                        ppi.await()
                         val acc = async { insertACCList(recordId) }
-//                        acc.await()
-                        awaitAll(hr, ppg, ppi, acc)
+                        acc.await()
                         println("MainActivity.initCollectDataJob runBlocking mDataLock:$mDataLock")
                     }
                     mDataLock = false
