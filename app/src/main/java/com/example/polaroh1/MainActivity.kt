@@ -106,9 +106,12 @@ class MainActivity : AppCompatActivity() {
                 RepositoryKit.insertHR(HREntity(recordId = recordId))
                 return@run
             }
-            RepositoryKit.insertHRList(*this.asSequence().onEach {
+           /* RepositoryKit.insertHRList(*this.asSequence().onEach {
                 it.recordId = recordId
-            }.toList().toTypedArray())
+            }.toList().toTypedArray())*/
+
+            //因時間差可能同時會有2個hr數值, 取其一
+            RepositoryKit.insertHR(HREntity(recordId = recordId,hr = this.firstOrNull()?.hr?:-999))
             this.clear()
         }
     }
@@ -140,7 +143,7 @@ class MainActivity : AppCompatActivity() {
 
     //TODO GoMoreEdgeKit.updatePPGRaw 每秒呼叫, 帶入所有ppg, 回傳result 寫入DB
     private fun updateSdkPPGRaw(ppg: Int) {
-        if (ppg < 0) return
+//        if (ppg < 0) return
 
         //hrArray 首次給空陣列, 之後取 stressSleepResult?.hrArray
         //rmssdArray 首次給空陣列, 之後取 stressSleepResult?.rmssdArray
@@ -233,8 +236,8 @@ class MainActivity : AppCompatActivity() {
                         hr.await()
                         val ppg = async { insertPPGList(recordId) }
                         ppg.await()
-                        val ppi = async { insertPPIList(recordId) }
-                        ppi.await()
+                        /*val ppi = async { insertPPIList(recordId) }
+                        ppi.await()*/
                         val acc = async { insertACCList(recordId) }
                         acc.await()
                         println("MainActivity.initCollectDataJob runBlocking mDataLock:$mDataLock")
@@ -394,7 +397,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         //輸入框
-        edt_device.filters = arrayOf(InputFilter.LengthFilter(MAX_LENGTH))
+        edt_device.filters = arrayOf(InputFilter.LengthFilter(MAX_LENGTH),InputFilter.AllCaps())
         edt_device.addTextChangedListener {
             println("ericyu - MainActivity.addTextChangedListener, ${it?.toString()}")
             input_layout.error = null
@@ -795,6 +798,7 @@ class MainActivity : AppCompatActivity() {
         tv_ppi_value.text = "--"
         tv_acc_value.text = "--"
         tv_record_log.text = getString(R.string.records_log, 0, 0)
+        tv_sdk_value.text = "--"
         progress_file_output.progress = 0
         progress_file_output.max = 0
     }
@@ -872,7 +876,7 @@ class MainActivity : AppCompatActivity() {
                         putExtra(Intent.EXTRA_STREAM, fileUri)
                         val createtime =
                             SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).run {
-                                format(Date(LocalDateTime.now().toEpochSecond(ZoneOffset.UTC)))
+                                format(Date(System.currentTimeMillis()))
                             }
 //                        val createDate = createtime.split(" ").firstOrNull() ?: ""
                         putExtra(
