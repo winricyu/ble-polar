@@ -353,6 +353,12 @@
                     app:barrierDirection="bottom"
                     app:constraint_referenced_ids="tv_acc,tv_acc_value" />
 
+                <androidx.constraintlayout.widget.Group
+                    android:id="@+id/group_except_ppg"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone"
+                    app:constraint_referenced_ids="tv_hr,tv_hr_value,tv_ppi,tv_ppi_value,tv_acc,tv_acc_value,tv_sdk,tv_sdk_value" />
 
             </androidx.constraintlayout.widget.ConstraintLayout>
 
@@ -545,6 +551,8 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             app:layout_constraintGuide_percent="0.7" />
+
+
 
 
     </androidx.constraintlayout.widget.ConstraintLayout>

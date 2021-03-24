@@ -19,6 +19,7 @@ class MainViewModel(private val mContext: Application) : AndroidViewModel(mConte
 
     val currentHRList: MutableLiveData<MutableList<HREntity>> = MutableLiveData(mutableListOf())
     val currentPPGList: MutableLiveData<MutableList<PPGEntity>> = MutableLiveData(mutableListOf())
+    val tempPPGList: MutableLiveData<MutableList<PPGEntity>> = MutableLiveData(mutableListOf())
     val currentPPIList: MutableLiveData<MutableList<PPIEntity>> = MutableLiveData(mutableListOf())
     val currentACCList: MutableLiveData<MutableList<ACCEntity>> = MutableLiveData(mutableListOf())
     val deviceDisconnectCounts: MutableLiveData<MutableList<Int>> = MutableLiveData(mutableListOf())

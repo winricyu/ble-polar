@@ -84,14 +84,16 @@ class MainActivity : AppCompatActivity() {
     private fun analyzeRecords() {
         lifecycleScope.launch(Dispatchers.IO) {
 
+            /*RepositoryKit.queryAllRecordsAsync().observe(this@MainActivity) {
+                println("ericyu - MainActivity.queryAllRecordsAsync, ${it.size}")
+                //if (mRecording.value == true) return@observe
+                tv_record_log.text = getString(R.string.records_log).format(it.size)
+            }*/
+
             RepositoryKit.queryAllRecords().run {
 
                 runOnUiThread {
-                    tv_record_log.text = getString(
-                        R.string.records_log,
-                        this.size,
-                        mViewModel.deviceDisconnectCounts.value?.size ?: 0
-                    )
+                    tv_record_log.text = getString(R.string.records_log).format( this.size)
 
                 }
             }
@@ -106,12 +108,17 @@ class MainActivity : AppCompatActivity() {
                 RepositoryKit.insertHR(HREntity(recordId = recordId))
                 return@run
             }
-           /* RepositoryKit.insertHRList(*this.asSequence().onEach {
-                it.recordId = recordId
-            }.toList().toTypedArray())*/
+            /* RepositoryKit.insertHRList(*this.asSequence().onEach {
+                 it.recordId = recordId
+             }.toList().toTypedArray())*/
 
             //因時間差可能同時會有2個hr數值, 取其一
-            RepositoryKit.insertHR(HREntity(recordId = recordId,hr = this.firstOrNull()?.hr?:-999))
+            RepositoryKit.insertHR(
+                HREntity(
+                    recordId = recordId,
+                    hr = this.firstOrNull()?.hr ?: -999
+                )
+            )
             this.clear()
         }
     }
@@ -274,7 +281,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 PolarStatus.CONNECTING -> {
                     switch_connect.text = "連線中..."
-                    mConnectionStartTime = 0
+                    //mConnectionStartTime = 0
                 }
                 PolarStatus.CONNECTED -> {
 
@@ -303,7 +310,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 PolarStatus.DISCONNECTED -> {
                     switch_connect.text = "已斷線"
-                    mConnectionStartTime = 0
+                    //mConnectionStartTime = 0
                     mTimer?.cancel()
                 }
             }
@@ -312,8 +319,25 @@ class MainActivity : AppCompatActivity() {
         mViewModel.currentHRList.observe(this) { list ->
             tv_hr_value.text = "${list.lastOrNull()?.hr}"
         }
+
+        //TODO 測試PPG資料不累積一秒鐘，拿到數值直接寫入DB
         mViewModel.currentPPGList.observe(this) { list ->
             tv_ppg_value.text = "${list.size}"
+
+            /*lifecycleScope.launch(Dispatchers.IO) {
+                val timestamp = Date()///LocalDateTime.now().toEpochSecond(ZoneOffset.UTC)
+                val recordId =
+                    RepositoryKit.insertRecord(RecordEntity(timestamp = timestamp))
+
+                //無資料時寫入空值
+                if (list.isEmpty()) {
+                    RepositoryKit.insertPPG(PPGEntity(recordId = recordId))
+                    return@launch
+                }
+                RepositoryKit.insertPPGList(*list.asSequence().onEachIndexed { index, it ->
+                    it.recordId = recordId
+                }.toList().toTypedArray())
+            }*/
         }
         mViewModel.currentPPIList.observe(this) { list ->
             tv_ppi_value.text = "${list.size}"
@@ -375,11 +399,12 @@ class MainActivity : AppCompatActivity() {
         switch_record.setOnCheckedChangeListener { _, isChecked ->
             mRecording.value = isChecked
             if (isChecked) {
-                initCollectDataJob()
-                mCollectDataJob.start()
+                //initCollectDataJob()
+                //mCollectDataJob.start()
 
             } else {
-                mCollectDataJob.cancel()
+                //mCollectDataJob.cancel()
+                mConnectionStartTime = 0
             }
 
         }
@@ -397,7 +422,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         //輸入框
-        edt_device.filters = arrayOf(InputFilter.LengthFilter(MAX_LENGTH),InputFilter.AllCaps())
+        edt_device.filters = arrayOf(InputFilter.LengthFilter(MAX_LENGTH), InputFilter.AllCaps())
         edt_device.addTextChangedListener {
             println("ericyu - MainActivity.addTextChangedListener, ${it?.toString()}")
             input_layout.error = null
@@ -583,9 +608,28 @@ class MainActivity : AppCompatActivity() {
                             if (!switch_record.isChecked) return@subscribe
                             if (mDataLock) return@subscribe
 
-                            mViewModel.currentPPGList.apply {
+                            /*mViewModel.currentPPGList.apply {
                                 this.value?.addAll(it)
                                 this.postValue(this.value)
+                            }*/
+
+                            lifecycleScope.launch(Dispatchers.Main){
+                                tv_ppg_value.text = "${it.size}"
+                            }
+                            //TODO 測試直接寫入
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                val timestamp = Date()///LocalDateTime.now().toEpochSecond(ZoneOffset.UTC)
+                                val recordId =
+                                    RepositoryKit.insertRecord(RecordEntity(timestamp = timestamp))
+
+                                //無資料時寫入空值
+                                if (it.isEmpty()) {
+                                    RepositoryKit.insertPPG(PPGEntity(recordId = recordId))
+                                    return@launch
+                                }
+                                RepositoryKit.insertPPGList(*it.asSequence().onEachIndexed { index, it ->
+                                    it.recordId = recordId
+                                }.toList().toTypedArray())
                             }
 
                         },
@@ -797,7 +841,7 @@ class MainActivity : AppCompatActivity() {
         tv_ppg_value.text = "--"
         tv_ppi_value.text = "--"
         tv_acc_value.text = "--"
-        tv_record_log.text = getString(R.string.records_log, 0, 0)
+        //tv_record_log.text = getString(R.string.records_log, 0, 0)
         tv_sdk_value.text = "--"
         progress_file_output.progress = 0
         progress_file_output.max = 0
@@ -844,18 +888,17 @@ class MainActivity : AppCompatActivity() {
                 FileProvider.getUriForFile(this@MainActivity, "polaroh1.fileprovider", file)
 
             csvWriter().openAsync(file) {
-                writeRow(listOf("TIMESTAMP", "HR", "PPG", "ACC_X", "ACC_Y", "ACC_Z"))
+                writeRow(listOf("TIMESTAMP", "PPG_0", "PPG_1", "PPG_2"))
+//                writeRow(listOf("TIMESTAMP", "HR", "PPG", "ACC_X", "ACC_Y", "ACC_Z"))
 
                 list.onEachIndexed { index, detail ->
 
                     writeRow(
                         listOf(
                             detail.record.timestamp.time,
-                            "[${detail.hrList.joinToString()}]",
-                            "[${detail.ppgList.joinToString()}]",
-                            "[${detail.accXList.joinToString()}]",
-                            "[${detail.accYList.joinToString()}]",
-                            "[${detail.accZList.joinToString()}]"
+                            "[${detail.ppg0List.joinToString()}]",
+//                            "[${detail.ppg1List.joinToString()}]",
+//                            "[${detail.ppg2List.joinToString()}]",
                         )
                     )
                     //顯示CSV格式轉換處理進度

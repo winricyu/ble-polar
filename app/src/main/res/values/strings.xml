@@ -1,5 +1,5 @@
 <resources>
     <string name="app_name">PolarOH1</string>
-    <string name="records_log">共 %1$d 筆記錄，斷線次數 %2$d 次</string>
+    <string name="records_log">共 %1$d 筆記錄</string>
     <string name="empty_records">無記錄資料</string>
 </resources>

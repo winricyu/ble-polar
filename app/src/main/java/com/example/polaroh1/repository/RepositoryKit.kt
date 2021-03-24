@@ -51,6 +51,7 @@ object RepositoryKit {
     }
 
     suspend fun queryAllRecords() = databaseManager.getRecordDao().queryAll()
+    suspend fun queryAllRecordsAsync() = databaseManager.getRecordDao().queryAllAsync()
     suspend fun queryAllACC() = databaseManager.getACCDao().queryAll()
     suspend fun queryRecordAndDetailAsync() =
         databaseManager.getRecordDao().queryRecordAndDetailAsync()

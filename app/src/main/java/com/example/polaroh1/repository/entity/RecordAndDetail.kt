@@ -8,13 +8,13 @@ data class RecordAndDetail(
     @Embedded
     val record: RecordEntity = RecordEntity(),
 
-    @Relation(
+    /*@Relation(
         parentColumn = "id",
         entityColumn = "recordId",
         entity = HREntity::class,
         projection = ["hr"]
     )
-    val hrList: List<Int> = listOf(),
+    val hrList: List<Int> = listOf(),*/
 
     @Relation(
         parentColumn = "id",
@@ -22,7 +22,24 @@ data class RecordAndDetail(
         entity = PPGEntity::class,
         projection = ["ppg0"]
     )
-    val ppgList: List<Int> = listOf(),
+    val ppg0List: List<Int> = listOf(),
+
+   /* @Relation(
+        parentColumn = "id",
+        entityColumn = "recordId",
+        entity = PPGEntity::class,
+        projection = ["ppg1"]
+    )
+    val ppg1List: List<Int> = listOf(),
+
+    @Relation(
+        parentColumn = "id",
+        entityColumn = "recordId",
+        entity = PPGEntity::class,
+        projection = ["ppg2"]
+    )
+    val ppg2List: List<Int> = listOf(),
+*/
 
     /*@Relation(
         parentColumn = "id",
@@ -32,7 +49,7 @@ data class RecordAndDetail(
     )
     val ppiList: List<Int> = listOf(),*/
 
-    @Relation(
+   /* @Relation(
         parentColumn = "id",
         entityColumn = "recordId",
         entity = ACCEntity::class,
@@ -54,7 +71,7 @@ data class RecordAndDetail(
         entity = ACCEntity::class,
         projection = ["z"]
     )
-    val accZList: List<Int> = listOf(),
+    val accZList: List<Int> = listOf(),*/
 
 
     )
