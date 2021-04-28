@@ -5,8 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.bomdic.gomoreedgekit.StressSleepResult
-import com.bomdic.gomoreedgekit.UserInfo
+import com.bomdic.gomoreedgekit.data.GMStressSleep
+import com.bomdic.gomoreedgekit.data.GMUserInfo
 import com.example.polaroh1.repository.entity.ACCEntity
 import com.example.polaroh1.repository.entity.HREntity
 import com.example.polaroh1.repository.entity.PPGEntity
@@ -23,8 +23,8 @@ class MainViewModel(private val mContext: Application) : AndroidViewModel(mConte
     val currentACCList: MutableLiveData<MutableList<ACCEntity>> = MutableLiveData(mutableListOf())
     val deviceDisconnectCounts: MutableLiveData<MutableList<Int>> = MutableLiveData(mutableListOf())
     val deviceId: MutableLiveData<String> = MutableLiveData("")
-    val userInfo: UserInfo = UserInfo(31, 1, 172f, 73f, 192, 60, 40f)
-    var stressSleepResult: MutableLiveData<StressSleepResult?> = MutableLiveData(StressSleepResult())
+    val userInfo: GMUserInfo = GMUserInfo(31, 1, 172f, 73f, 192, 60)
+    var stressSleepResult: MutableLiveData<GMStressSleep?> = MutableLiveData(GMStressSleep())
     val polarApi: PolarBleApi by lazy {
         PolarBleApiDefaultImpl.defaultImplementation(
             mContext,

@@ -19,9 +19,10 @@ import androidx.core.widget.addTextChangedListener
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
+import com.bomdic.gomoreedgekit.GMEdge
 import com.bomdic.gomoreedgekit.GoMoreEdgeKit
-import com.bomdic.gomoreedgekit.StressSleepParam
-import com.bomdic.gomoreedgekit.StressSleepResult
+import com.bomdic.gomoreedgekit.data.GMActivityInfo
+import com.bomdic.gomoreedgekit.data.GMPPGRaw
 import com.example.polaroh1.repository.RepositoryKit
 import com.example.polaroh1.repository.entity.*
 import com.example.polaroh1.utils.MainViewModel
@@ -106,12 +107,17 @@ class MainActivity : AppCompatActivity() {
                 RepositoryKit.insertHR(HREntity(recordId = recordId))
                 return@run
             }
-           /* RepositoryKit.insertHRList(*this.asSequence().onEach {
-                it.recordId = recordId
-            }.toList().toTypedArray())*/
+            /* RepositoryKit.insertHRList(*this.asSequence().onEach {
+                 it.recordId = recordId
+             }.toList().toTypedArray())*/
 
             //因時間差可能同時會有2個hr數值, 取其一
-            RepositoryKit.insertHR(HREntity(recordId = recordId,hr = this.firstOrNull()?.hr?:-999))
+            RepositoryKit.insertHR(
+                HREntity(
+                    recordId = recordId,
+                    hr = this.firstOrNull()?.hr ?: -999
+                )
+            )
             this.clear()
         }
     }
@@ -132,11 +138,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun getSdkActivityInfo(hr: Int): FloatArray {
+    private fun getSdkActivityInfo(hr: Int): GMActivityInfo {
 
-        return GoMoreEdgeKit.getActivityInfoExt(
+        return GMEdge.getActivityInfoExt(
             intArrayOf(LocalDateTime.now().toEpochSecond(ZoneOffset.UTC).toInt()),
-            floatArrayOf(hr.toFloat())
+            intArrayOf(hr)
         )
     }
 
@@ -149,9 +155,9 @@ class MainActivity : AppCompatActivity() {
         //rmssdArray 首次給空陣列, 之後取 stressSleepResult?.rmssdArray
         val hrArr = mViewModel.stressSleepResult.value?.hrArray ?: intArrayOf()
         val rmssdArr = mViewModel.stressSleepResult.value?.rmssdArray ?: intArrayOf()
-        val updatePPGResult = GoMoreEdgeKit.updatePPGRaw(
-            LocalDateTime.now().toEpochSecond(ZoneOffset.UTC).toInt(),
-            StressSleepParam(
+        val updatePPGResult = GMEdge.updatePPGRaw(
+            GMPPGRaw(
+                LocalDateTime.now().toEpochSecond(ZoneOffset.UTC).toInt(),
                 ppg.toFloat(),
                 0f,
                 135,
@@ -159,8 +165,7 @@ class MainActivity : AppCompatActivity() {
                 0,
                 hrArr,
                 rmssdArr
-            ),
-            StressSleepResult()
+            )
         )
 
 //        mViewModel.stressSleepResult.value?.apply {
@@ -178,7 +183,7 @@ class MainActivity : AppCompatActivity() {
                         stress = it.stress,
                         hrArray = it.hrArray.toList(),
                         ppiArray = it.ppiArray.toList(),
-                        ppiLen = it.ppiLen,
+                        ppiLen = it.ppiArray.size,
                         rmssdArray = it.rmssdArray.toList()
                     )
                 )
@@ -332,8 +337,7 @@ class MainActivity : AppCompatActivity() {
         mViewModel.stressSleepResult.observe(this) {
             //TODO 列印SDK結果
             it?.apply {
-                println("stressSleepResult, stress:$stress, ppiArray:${ppiArray.toList()}, ppiLen:$ppiLen")
-                tv_sdk_value.text = "stress:$stress, ppiLen:$ppiLen"
+                //tv_sdk_value.text = "stress:$stress, ppiLen:$ppiLen"
             }
         }
 
@@ -397,7 +401,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         //輸入框
-        edt_device.filters = arrayOf(InputFilter.LengthFilter(MAX_LENGTH),InputFilter.AllCaps())
+        edt_device.filters = arrayOf(InputFilter.LengthFilter(MAX_LENGTH), InputFilter.AllCaps())
         edt_device.addTextChangedListener {
             println("ericyu - MainActivity.addTextChangedListener, ${it?.toString()}")
             input_layout.error = null
@@ -723,8 +727,8 @@ class MainActivity : AppCompatActivity() {
         mWakeLock.acquire(86400000)
 
         //TODO 測試寫入GoMoreEdgeKit
-        GoMoreEdgeKit.initialize()
-        GoMoreEdgeKit.healthIndexInitUser(mViewModel.userInfo, 1609372799)
+        GoMoreEdgeKit.initialize(this)
+        GMEdge.healthIndexInitUser(mViewModel.userInfo, 40f, 1609372799)
 
         when {
             (ContextCompat.checkSelfPermission(
@@ -912,10 +916,10 @@ fun GoMoreEdgeKit.Kit.updatePPGRawExt(
 }
 */
 
-fun GoMoreEdgeKit.Kit.getActivityInfoExt(
-    timestampList: kotlin.IntArray,
-    hrList: kotlin.FloatArray
-): FloatArray {
+fun GMEdge.Companion.getActivityInfoExt(
+    timestampList: IntArray,
+    hrList: IntArray
+): GMActivityInfo {
     println("ericyu - <top>.getActivityInfoExt, timestampList = ${timestampList.toList()}, hrList = ${hrList.toList()}")
     return getActivityInfo(timestampList, hrList)
 }
