@@ -8,6 +8,9 @@ data class RecordAndDetail(
     @Embedded
     val record: RecordEntity = RecordEntity(),
 
+    /* @Embedded
+     val ppg:PPGEntity=PPGEntity(),*/
+
     @Relation(
         parentColumn = "id",
         entityColumn = "recordId",
@@ -16,13 +19,37 @@ data class RecordAndDetail(
     )
     val hrList: List<Int> = listOf(),
 
-    @Relation(
+     @Relation(
+         parentColumn = "id",
+         entityColumn = "recordId",
+         entity = PPGEntity::class,
+         projection = ["ppg0"]
+     )
+     val ppg1List: List<Int> = listOf(),
+
+    /* @Relation(
+         parentColumn = "id",
+         entityColumn = "recordId",
+         entity = PPGEntity::class,
+         projection = ["ppg1"]
+     )
+     val ppg2List: List<Int> = listOf(),
+
+     @Relation(
+         parentColumn = "id",
+         entityColumn = "recordId",
+         entity = PPGEntity::class,
+         projection = ["ppg2"]
+     )
+     val ppg3List: List<Int> = listOf(),*/
+
+   /* @Relation(
         parentColumn = "id",
         entityColumn = "recordId",
         entity = PPGEntity::class,
-        projection = ["ppg0"]
     )
-    val ppgList: List<Int> = listOf(),
+    val ppg: List<PPGEntity> = listOf(),*/
+
 
     /*@Relation(
         parentColumn = "id",
@@ -32,7 +59,7 @@ data class RecordAndDetail(
     )
     val ppiList: List<Int> = listOf(),*/
 
-    @Relation(
+    /*@Relation(
         parentColumn = "id",
         entityColumn = "recordId",
         entity = ACCEntity::class,
@@ -54,7 +81,7 @@ data class RecordAndDetail(
         entity = ACCEntity::class,
         projection = ["z"]
     )
-    val accZList: List<Int> = listOf(),
+    val accZList: List<Int> = listOf(),*/
 
 
     )

@@ -20,20 +20,34 @@ interface RecordDao {
     fun delete(data: RecordEntity)
 
     @Query("DELETE FROM RECORD")
-    fun deleteAll():Int
+    fun deleteAll(): Int
 
     @Query("SELECT * FROM RECORD")
     fun queryAll(): List<RecordEntity>
 
+    @Query("SELECT COUNT(id) FROM RECORD")
+    fun queryCountAsync(): LiveData<Int>
+
+    @Query("SELECT COUNT(id) FROM RECORD")
+    fun queryCount(): Int
+
     @Query("SELECT * FROM RECORD")
     fun queryAllAsync(): LiveData<List<RecordEntity>>
 
-    @Transaction
+    @Query("SELECT * FROM RECORD ORDER BY id ASC LIMIT :limit OFFSET :offset")
+    fun queryRecordByCountAsync(limit: Int, offset: Int): LiveData<List<RecordEntity>>
+
+    /*@Transaction
     @Query("SELECT * FROM RECORD")
-    fun queryRecordAndDetailAsync():LiveData<List<RecordAndDetail>>
+    fun queryRecordAndDetailAsync(): LiveData<List<RecordAndDetail>>*/
+
+
+    /*@Transaction
+    @Query("SELECT * FROM RECORD ORDER BY id ASC LIMIT :limit OFFSET :offset")
+    fun queryRecordDetailByCountAsync(limit: Int, offset: Int): LiveData<List<RecordAndDetail>>
 
     @Transaction
     @Query("SELECT * FROM RECORD")
-    fun queryRecordAndDetail():List<RecordAndDetail>
+    fun queryRecordAndDetail(): List<RecordAndDetail>*/
 
 }

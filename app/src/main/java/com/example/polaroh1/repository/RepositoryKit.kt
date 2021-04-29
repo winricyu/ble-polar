@@ -14,61 +14,76 @@ object RepositoryKit {
             Room.databaseBuilder(context, DatabaseManager::class.java, "PolarDB").build()
     }
 
-    suspend fun insertHR(hrEntity: HREntity) {
+    fun insertHR(hrEntity: HREntity) {
         databaseManager.getHRDao().insert(hrEntity)
     }
 
-    suspend fun insertACC(accEntity: ACCEntity) {
+    fun insertACC(accEntity: ACCEntity) {
         databaseManager.getACCDao().insert(accEntity)
     }
 
-    suspend fun insertPPG(ppgEntity: PPGEntity) {
+    fun insertPPG(ppgEntity: PPGEntity) {
         databaseManager.getPPGDao().insert(ppgEntity)
     }
 
-    suspend fun insertPPI(ppiEntity: PPIEntity) {
+    fun insertPPI(ppiEntity: PPIEntity) {
         databaseManager.getPPIDao().insert(ppiEntity)
     }
 
-    suspend fun insertSleep(sleepEntity: SleepEntity) {
+    fun insertSleep(sleepEntity: SleepEntity) {
         databaseManager.getSleepDao().insert(sleepEntity)
     }
 
-    suspend fun insertHRList(vararg samples: HREntity) {
+    fun insertHRList(vararg samples: HREntity) {
         databaseManager.getHRDao().insertAll(*samples)
     }
 
-    suspend fun insertACCList(vararg samples: ACCEntity) {
+    fun insertACCList(vararg samples: ACCEntity) {
         databaseManager.getACCDao().insertAll(*samples)
     }
 
-    suspend fun insertPPGList(vararg samples: PPGEntity) {
+    fun insertPPGList(vararg samples: PPGEntity) {
+        println(
+            "RepositoryKit.insertPPGList , samples = ${
+                when (samples.size) {
+                    126, 144 -> "${samples.size}"
+                    else -> "[${samples.size}]"
+
+                }
+            }"
+        )
         databaseManager.getPPGDao().insertAll(*samples)
     }
 
-    suspend fun insertPPIList(vararg samples: PPIEntity) {
+    fun insertPPIList(vararg samples: PPIEntity) {
         databaseManager.getPPIDao().insertAll(*samples)
     }
 
-    suspend fun queryAllRecords() = databaseManager.getRecordDao().queryAll()
-    suspend fun queryAllACC() = databaseManager.getACCDao().queryAll()
-    suspend fun queryRecordAndDetailAsync() =
-        databaseManager.getRecordDao().queryRecordAndDetailAsync()
-    suspend fun queryRecordAndDetail() =
-        databaseManager.getRecordDao().queryRecordAndDetail()
+    fun queryAllRecordsAsync() = databaseManager.getRecordDao().queryAllAsync()
+    fun queryAllRecords() = databaseManager.getRecordDao().queryAll()
+    fun queryAllACC() = databaseManager.getACCDao().queryAll()
+    fun queryRecordByCountAsync(limit: Int, offset: Int) =
+        databaseManager.getRecordDao().queryRecordByCountAsync(limit, offset)
+    //fun queryRecordAndDetailAsync() = databaseManager.getRecordDao().queryRecordAndDetailAsync()
 
-    suspend fun queryAllACCAsync() = databaseManager.getACCDao().queryAllAsync()
+    /* fun queryRecordDetailByCountAsync(limit: Int, offset: Int) =
+         databaseManager.getRecordDao().queryRecordDetailByCountAsync(limit, offset)
 
-    suspend fun insertRecord(recordEntity: RecordEntity) =
+     fun queryRecordAndDetail() =
+         databaseManager.getRecordDao().queryRecordAndDetail()*/
+
+    fun queryAllACCAsync() = databaseManager.getACCDao().queryAllAsync()
+
+    fun insertRecord(recordEntity: RecordEntity) =
         databaseManager.getRecordDao().insert(recordEntity)
 
 
-    suspend fun clearAllTables() {
+    fun clearAllTables() {
         println("ericyu - RepositoryKit.clearAllData")
         databaseManager.clearAllTables()
     }
 
-    suspend fun clearAllTableEntries(){
+    fun clearAllTableEntries() {
         println("ericyu - RepositoryKit.clearAllTableEntries")
         println("getRecordDao().deleteAll: ${databaseManager.getRecordDao().deleteAll()}")
         println("getHRDao().deleteAll: ${databaseManager.getHRDao().deleteAll()}")
@@ -77,5 +92,9 @@ object RepositoryKit {
         println("getACCDao().deleteAll: ${databaseManager.getACCDao().deleteAll()}")
         println("getACCDao().deleteAll: ${databaseManager.getSleepDao().deleteAll()}")
     }
+
+    fun queryRecordCountAsync() = databaseManager.getRecordDao().queryCountAsync()
+    fun queryRecordCount() = databaseManager.getRecordDao().queryCount()
+
 
 }

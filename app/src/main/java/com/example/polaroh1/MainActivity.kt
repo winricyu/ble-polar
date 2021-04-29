@@ -21,9 +21,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.bomdic.gomoreedgekit.GMEdge
 import com.bomdic.gomoreedgekit.GoMoreEdgeKit
-import com.bomdic.gomoreedgekit.data.GMActivityInfo
 import com.bomdic.gomoreedgekit.data.GMPPGRaw
-import com.example.polaroh1.repository.RepositoryKit
 import com.example.polaroh1.repository.entity.*
 import com.example.polaroh1.utils.MainViewModel
 import com.example.polaroh1.utils.MainViewModelFactory
@@ -34,6 +32,7 @@ import io.reactivex.rxjava3.functions.Function
 import io.reactivex.rxjava3.schedulers.Schedulers
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Semaphore
 import org.reactivestreams.Publisher
 import polar.com.sdk.api.PolarBleApiCallback
 import polar.com.sdk.api.model.*
@@ -50,6 +49,8 @@ class MainActivity : AppCompatActivity() {
         private const val REQUEST_LOCATION_PERMISSIONS = 11
         private const val MAX_LENGTH = 8
         private const val DEVICE_ID = "DEVICE_ID"
+        private const val CSV_MAX_ROW = 100
+        private val PATTERN_WHITE_SPACE = "\\s".toRegex()
     }
 
     private val mViewModel by lazy {
@@ -59,13 +60,10 @@ class MainActivity : AppCompatActivity() {
     private val mViewModelFactory by lazy {
         MainViewModelFactory(application)
     }
-
-
     private val mWakeLock by lazy {
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, getString(R.string.app_name))
     }
-
     private val mSharedPreferences by lazy {
         getSharedPreferences("local_storage", MODE_PRIVATE)
     }
@@ -77,13 +75,29 @@ class MainActivity : AppCompatActivity() {
     private var mPPGDisposable: Disposable? = null
     private var mPPIDisposable: Disposable? = null
     private var mACCDisposable: Disposable? = null
-    private var mDataLock: Boolean = false
+
+    //private var mDataLock: Boolean = false
     private var mTimer: Timer? = null
+    private val mPPGSemaphore = Semaphore(1)
+    private val mHRSemaphore = Semaphore(1)
+    private val mACCSemaphore = Semaphore(1)
 
     private lateinit var mCollectDataJob: Job
 
     private fun analyzeRecords() {
-        lifecycleScope.launch(Dispatchers.IO) {
+
+        mViewModel.queryRecordCountAsync().apply {
+            observe(this@MainActivity) {
+                println("MainActivity.queryRecordCountAsync analyzeRecords ${it}")
+                removeObservers(this@MainActivity)
+                tv_record_log.text = getString(
+                    R.string.records_log,
+                    it,
+                    mViewModel.deviceDisconnectCounts.value?.size ?: 0
+                )
+            }
+        }
+        /*lifecycleScope.launch(Dispatchers.IO) {
 
             RepositoryKit.queryAllRecords().run {
 
@@ -96,20 +110,61 @@ class MainActivity : AppCompatActivity() {
 
                 }
             }
+        }*/
+    }
+
+
+    private suspend fun collectHRRawData(hr: Int) {
+        println("MainActivity.collectHRRawData , hr = [${hr}]")
+        withContext(Dispatchers.IO) {
+            try {
+                mHRSemaphore.acquire()
+                mViewModel.currentHRList.value?.apply {
+                    this.add(HREntity(hr = hr))
+                    mViewModel.currentHRList.postValue(this)
+                }
+            } finally {
+                mHRSemaphore.release()
+            }
         }
     }
 
     private suspend fun insertHRList(recordId: Long) {
         println("MainActivity.insertHRList , recordId = [${recordId}]")
-        mViewModel.currentHRList.value?.run {
+        try {
+            mHRSemaphore.acquire()
+            mViewModel.currentHRList.value?.apply {
+                if (isEmpty()) {
+                    //無資料時寫入空值
+                    mViewModel.insertHR(HREntity(recordId = recordId))
+                    //RepositoryKit.insertHR(HREntity(recordId = recordId))
+                } else {
+                    mViewModel.insertHR(
+                        HREntity(
+                            recordId = recordId,
+                            hr = this.firstOrNull()?.hr ?: -999
+                        )
+                    )
+                    /*RepositoryKit.insertHR(
+                        HREntity(
+                            recordId = recordId,
+                            hr = this.firstOrNull()?.hr ?: -999
+                        )
+                    )*/
+                }
+            }
+
+            mViewModel.currentHRList.value?.clear()
+        } finally {
+            mHRSemaphore.release()
+        }
+
+        /*mViewModel.currentHRList.value?.run {
             //無資料時寫入空值
             if (isEmpty()) {
                 RepositoryKit.insertHR(HREntity(recordId = recordId))
                 return@run
             }
-            /* RepositoryKit.insertHRList(*this.asSequence().onEach {
-                 it.recordId = recordId
-             }.toList().toTypedArray())*/
 
             //因時間差可能同時會有2個hr數值, 取其一
             RepositoryKit.insertHR(
@@ -119,33 +174,8 @@ class MainActivity : AppCompatActivity() {
                 )
             )
             this.clear()
-        }
+        }*/
     }
-
-    private suspend fun insertPPGList(recordId: Long) {
-        println("MainActivity.insertPPGList , recordId = [${recordId}]")
-        mViewModel.currentPPGList.value?.run {
-            //無資料時寫入空值
-            if (isEmpty()) {
-                RepositoryKit.insertPPG(PPGEntity(recordId = recordId))
-                return@run
-            }
-            RepositoryKit.insertPPGList(*this.asSequence().onEachIndexed { index, it ->
-                it.recordId = recordId
-                updateSdkPPGRaw(it.ppg0)
-            }.toList().toTypedArray())
-            this.clear()
-        }
-    }
-
-    private fun getSdkActivityInfo(hr: Int): GMActivityInfo {
-
-        return GMEdge.getActivityInfoExt(
-            intArrayOf(LocalDateTime.now().toEpochSecond(ZoneOffset.UTC).toInt()),
-            intArrayOf(hr)
-        )
-    }
-
 
     //TODO GoMoreEdgeKit.updatePPGRaw 每秒呼叫, 帶入所有ppg, 回傳result 寫入DB
     private fun updateSdkPPGRaw(ppg: Int) {
@@ -155,30 +185,31 @@ class MainActivity : AppCompatActivity() {
         //rmssdArray 首次給空陣列, 之後取 stressSleepResult?.rmssdArray
         val hrArr = mViewModel.stressSleepResult.value?.hrArray ?: intArrayOf()
         val rmssdArr = mViewModel.stressSleepResult.value?.rmssdArray ?: intArrayOf()
-        val updatePPGResult = GMEdge.updatePPGRaw(
+        val gmStressSleep = GMEdge.updatePPGRaw(
             GMPPGRaw(
-                LocalDateTime.now().toEpochSecond(ZoneOffset.UTC).toInt(),
-                ppg.toFloat(),
-                0f,
-                135,
-                floatArrayOf(0f, 0f, 0f),
-                0,
-                hrArr,
-                rmssdArr
-            )
+                timestamp = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC).toInt(),
+                ppgRaw1 = ppg.toFloat(),
+                ppgRaw2 = 0f,
+                ppgLen = 135,
+                accArray = floatArrayOf(0f, 0f, 0f),
+                accLen = 0,
+                hrArray = hrArr,
+                rmssdArray = rmssdArr
+            ),
         )
 
 //        mViewModel.stressSleepResult.value?.apply {
 
         //TODO 寫入DB
-        updatePPGResult?.also {
+        gmStressSleep.also {
 
             if ((it.hrArray.isEmpty()) or (it.rmssdArray.isEmpty())) {
                 return@also
             }
 
             lifecycleScope.launch(Dispatchers.IO) {
-                RepositoryKit.insertSleep(
+
+                mViewModel.insertSleep(
                     SleepEntity(
                         stress = it.stress,
                         hrArray = it.hrArray.toList(),
@@ -187,41 +218,52 @@ class MainActivity : AppCompatActivity() {
                         rmssdArray = it.rmssdArray.toList()
                     )
                 )
+
+                /*RepositoryKit.insertSleep(
+                    SleepEntity(
+                        stress = it.stress,
+                        hrArray = it.hrArray.toList(),
+                        ppiArray = it.ppiArray.toList(),
+                        ppiLen = it.ppiArray.size,
+                        rmssdArray = it.rmssdArray.toList()
+                    )
+                )*/
             }
 
-            mViewModel.stressSleepResult.postValue(updatePPGResult)
+            mViewModel.stressSleepResult.postValue(gmStressSleep)
         }
 //        }
     }
 
-    private suspend fun insertPPIList(recordId: Long) {
-        println("MainActivity.insertPPIList , recordId = [${recordId}]")
-        mViewModel.currentPPIList.value?.run {
-            //無資料時寫入空值
-            if (isEmpty()) {
-                RepositoryKit.insertPPI(PPIEntity(recordId = recordId))
-                return@run
-            }
-            RepositoryKit.insertPPIList(*this.asSequence().onEach {
-                it.recordId = recordId
-            }.toList().toTypedArray())
-            this.clear()
-        }
-    }
-
     private suspend fun insertACCList(recordId: Long) {
         println("MainActivity.insertACCList , recordId = [${recordId}]")
-        mViewModel.currentACCList.value?.run {
+        try {
+            mACCSemaphore.acquire()
+            mViewModel.currentACCList.value?.apply {
+                if (isEmpty()) {
+                    mViewModel.insertACC(ACCEntity(recordId = recordId))
+                } else {
+                    mViewModel.insertACCList(recordId, *this.toTypedArray())
+                }
+            }
+            mViewModel.currentACCList.value?.clear()
+        } finally {
+            mACCSemaphore.release()
+        }
+
+        /*mViewModel.currentACCList.value?.run {
             //無資料時寫入空值
             if (isEmpty()) {
-                RepositoryKit.insertACC(ACCEntity(recordId = recordId))
+                mViewModel.insertACC(ACCEntity(recordId = recordId))
+                //RepositoryKit.insertACC(ACCEntity(recordId = recordId))
                 return@run
             }
-            RepositoryKit.insertACCList(*this.asSequence().onEach {
+            mViewModel.insertACCList(recordId, *this.toTypedArray())
+            *//*RepositoryKit.insertACCList(*this.asSequence().onEach {
                 it.recordId = recordId
-            }.toList().toTypedArray())
+            }.toList().toTypedArray())*//*
             this.clear()
-        }
+        }*/
     }
 
     private fun initCollectDataJob() {
@@ -231,23 +273,57 @@ class MainActivity : AppCompatActivity() {
                 //Polar OH1 可使用12小時
                 repeat(43200) { repeatCount ->
                     val timestamp = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC)
-                    val recordId =
-                        RepositoryKit.insertRecord(RecordEntity(timestamp = Date(timestamp)))
+                    //val recordId = mViewModel.insertRecord(RecordEntity(timestamp = Date(timestamp)))
+                    val recordEntity = RecordEntity(timestamp = Date(timestamp))
 
                     runBlocking {
-                        mDataLock = true
-                        println("MainActivity.initCollectDataJob runBlocking 1 mDataLock:$mDataLock")
-                        val hr = async { insertHRList(recordId) }
-                        hr.await()
-                        val ppg = async { insertPPGList(recordId) }
-                        ppg.await()
-                        /*val ppi = async { insertPPIList(recordId) }
-                        ppi.await()*/
-                        val acc = async { insertACCList(recordId) }
-                        acc.await()
-                        println("MainActivity.initCollectDataJob runBlocking mDataLock:$mDataLock")
+                        println("MainActivity.initCollectDataJob runBlocking 1")
+
+                        //insertHRList(recordId)
+                        try {
+                            mHRSemaphore.acquire()
+                            mViewModel.currentHRList.value?.apply {
+                                recordEntity.hrList = this.map { it.hr }
+                                clear()
+                            }
+                        } finally {
+                            mHRSemaphore.release()
+                        }
+
+                        //insertPPGList(recordId)
+                        try {
+                            mPPGSemaphore.acquire()
+                            mViewModel.currentPPGList.value?.apply {
+                                recordEntity.ppg1 = this.size
+                                recordEntity.ppg1List = this.map { it.ppg0 }
+                                recordEntity.ppg2List = this.map { it.ppg1 }
+                                recordEntity.ppg3List = this.map { it.ppg2 }
+                                recordEntity.ambient1List = this.map { it.ambient }
+                                recordEntity.ambient2List = this.map { it.ambient2 }
+                                clear()
+                            }
+                        } finally {
+                            mPPGSemaphore.release()
+                        }
+
+                        //insertACCList(recordId)
+                        try {
+                            mACCSemaphore.acquire()
+                            mViewModel.currentACCList.value?.apply {
+                                recordEntity.accXList = this.map { it.x }
+                                recordEntity.accYList = this.map { it.y }
+                                recordEntity.accXList = this.map { it.z }
+                                clear()
+                            }
+                        } finally {
+                            mACCSemaphore.release()
+                        }
+
+                        mViewModel.insertRecord(recordEntity)
+
+                        println("MainActivity.initCollectDataJob runBlocking 2")
                     }
-                    mDataLock = false
+                    //mDataLock = false
 
                     delay(1000)
                 }
@@ -255,10 +331,153 @@ class MainActivity : AppCompatActivity() {
             }
     }
 
+    private suspend fun collectACCRawData(list: List<ACCEntity>) {
+        println("MainActivity.collectACCRawData , list = [${list.size}]")
+        withContext(Dispatchers.IO) {
+            try {
+                mACCSemaphore.acquire()
+                mViewModel.currentACCList.value?.apply {
+                    this.addAll(list)
+                    mViewModel.currentACCList.postValue(this)
+                }
+            } finally {
+                mACCSemaphore.release()
+            }
+        }
+    }
+
+    //收集PPG raw data
+    private suspend fun collectPPGRawData(list: List<PPGEntity>) {
+        println("MainActivity.collectPPGRawData , list = [${list.size}] ,${mViewModel.currentPPGList.value?.size}")
+        withContext(Dispatchers.IO) {
+            try {
+                mPPGSemaphore.acquire()
+                mViewModel.currentPPGList.value?.apply {
+                    this.addAll(list)
+                    mViewModel.currentPPGList.postValue(this)
+                }
+            } finally {
+                mPPGSemaphore.release()
+            }
+        }
+    }
+
+    private suspend fun insertPPGList(recordId: Long) {
+        println("MainActivity.insertPPGList START , recordId = [${recordId}]")
+
+        try {
+            mPPGSemaphore.acquire()
+            //val tempList: List<PPGEntity>? =  mViewModel.currentPPGList.value
+//            mViewModel.currentPPGList.value?.clear()
+            mViewModel.currentPPGList.value?.apply {
+                if (isEmpty()) {
+                    //無資料時寫入空值
+                    mViewModel.insertPPG(PPGEntity(recordId = recordId))
+                    //RepositoryKit.insertPPG(PPGEntity(recordId = recordId))
+                } else {
+                    //寫入PPG數值
+                    mViewModel.insertPPGList(recordId, *this.toTypedArray())
+                    /*RepositoryKit.insertPPGList(
+                        *this.asSequence().onEachIndexed { _, it -> it.recordId = recordId }
+                            .toList()
+                            .toTypedArray()
+                    )*/
+                }
+            }
+
+            mViewModel.currentPPGList.value?.clear()
+
+        } finally {
+
+            mPPGSemaphore.release()
+            println("MainActivity.insertPPGList RELEASE")
+        }
+
+        /* RepositoryKit.insertPPGList(*this.asSequence().onEachIndexed { index, it ->
+             it.recordId = recordId
+             updateSdkPPGRaw(it.ppg0)
+         }.toList().toTypedArray())
+         this.clear()*/
+
+        println("MainActivity.insertPPGList END , recordId = [${recordId}]")
+    }
+
+
     override fun onStart() {
         super.onStart()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
 
+    override fun onResume() {
+        super.onResume()
+        println("ericyu - MainActivity.onResume")
+        mViewModel.polarApi.foregroundEntered()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        println("ericyu - MainActivity.onPause")
+        mViewModel.polarApi.backgroundEntered()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        println("MainActivity.onStop")
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        println("ericyu - MainActivity.onDestroy")
+        mViewModel.polarApi.shutDown()
+        mWakeLock.release()
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        println("MainActivity.onCreate")
+        setContentView(R.layout.activity_main)
+        mWakeLock.acquire(86400000)
+
+        //TODO 測試寫入GoMoreEdgeKit
+        GoMoreEdgeKit.initialize(this)
+        GMEdge.healthIndexInitUser(mViewModel.userInfo, 40f, 1609372799)
+
+        when {
+            (ContextCompat.checkSelfPermission(
+                this, Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED) and
+                    (ContextCompat.checkSelfPermission(
+                        this, Manifest.permission.ACCESS_FINE_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED) and
+                    (ContextCompat.checkSelfPermission(
+                        this, Manifest.permission.WRITE_EXTERNAL_STORAGE
+                    ) == PackageManager.PERMISSION_GRANTED) and
+                    (ContextCompat.checkSelfPermission(
+                        this, Manifest.permission.READ_EXTERNAL_STORAGE
+                    ) == PackageManager.PERMISSION_GRANTED) -> {
+                println("ericyu - MainActivity.onCreate, permissions granted")
+
+            }
+
+            else -> {
+                requestPermissions(
+                    arrayOf(
+                        Manifest.permission.ACCESS_COARSE_LOCATION,
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                        Manifest.permission.READ_EXTERNAL_STORAGE,
+                    ), Companion.REQUEST_LOCATION_PERMISSIONS
+                )
+            }
+        }
+
+        //取得暫存device id
+        mSharedPreferences.getString(DEVICE_ID, "")?.takeIf { !it.isNullOrBlank() }?.run {
+            FirebaseCrashlytics.getInstance().setCustomKey("DeviceId", this)
+            edt_device.setText(this)
+        }
+
+        tv_version.text = "v${BuildConfig.VERSION_NAME}"
 
         //處理裝置連線狀態
         mPolarStatus.observe(this) { status ->
@@ -320,9 +539,30 @@ class MainActivity : AppCompatActivity() {
         mViewModel.currentPPGList.observe(this) { list ->
             tv_ppg_value.text = "${list.size}"
         }
-        mViewModel.currentPPIList.observe(this) { list ->
-            tv_ppi_value.text = "${list.size}"
+
+        //TODO Semaphore
+        mViewModel.rawPPGList.observe(this) { list ->
+            lifecycleScope.launch(Dispatchers.IO) {
+                collectPPGRawData(list)
+            }
         }
+
+        mViewModel.rawHR.observe(this) {
+            lifecycleScope.launch(Dispatchers.IO) {
+                collectHRRawData(it)
+            }
+        }
+
+        mViewModel.rawACCList.observe(this) {
+            lifecycleScope.launch(Dispatchers.IO) {
+                collectACCRawData(it)
+            }
+        }
+
+
+        /* mViewModel.currentPPIList.observe(this) { list ->
+             tv_ppi_value.text = "${list.size}"
+         }*/
         mViewModel.currentACCList.observe(this) { list ->
             tv_acc_value.text = "${list.size}"
         }
@@ -336,9 +576,10 @@ class MainActivity : AppCompatActivity() {
 
         mViewModel.stressSleepResult.observe(this) {
             //TODO 列印SDK結果
-            it?.apply {
-                //tv_sdk_value.text = "stress:$stress, ppiLen:$ppiLen"
-            }
+            /*it?.apply {
+                println("stressSleepResult, stress:$stress, ppiArray:${ppiArray.toList()}, ppiLen:${ppiArray.size}")
+                tv_sdk_value.text = "stress:$stress, ppiLen:${ppiArray.size}"
+            }*/
         }
 
 
@@ -437,15 +678,35 @@ class MainActivity : AppCompatActivity() {
         }
 
         btn_download.setOnClickListener {
-            lifecycleScope.launch(Dispatchers.IO) {
-                if (RepositoryKit.queryAllRecords().isEmpty()) {
-                    runOnUiThread {
+
+            mViewModel.queryRecordCountAsync().apply {
+                observe(this@MainActivity) {
+                    println("MainActivity.queryRecordCountAsync btn_download ${it}")
+                    removeObservers(this@MainActivity)
+                    if (it == 0) {
                         Toast.makeText(this@MainActivity, "無資料", Toast.LENGTH_SHORT).show()
+                        return@observe
                     }
-                    return@launch
+
+
+                    group_loading.isVisible = true
+                    progress_file_output.progress = 0
+                    progress_file_output.max = it
+                    tv_loading.text = "處理中"
+                    progress_file_loading.isVisible = true
+
+
+                    downloadFile(it)
                 }
-                downloadFile()
             }
+
+            /*if (RepositoryKit.queryAllRecords().isEmpty()) {
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "無資料", Toast.LENGTH_SHORT).show()
+                }
+                return@launch
+            }
+            downloadFile()*/
         }
 
         mViewModel.polarApi.setAutomaticReconnection(true)
@@ -527,13 +788,14 @@ class MainActivity : AppCompatActivity() {
                     .subscribe(
                         {
                             //每???ms收到資料
-                            println("ericyu - MainActivity.acc, onRecieved ${it.size}, mDataLock:${mDataLock}")
+                            println("ericyu - MainActivity.acc, onRecieved ${it.size}")
                             if (!switch_record.isChecked) return@subscribe
-                            if (mDataLock) return@subscribe
-                            mViewModel.currentACCList.apply {
+                            mViewModel.rawACCList.postValue(it)
+                            //if (mDataLock) return@subscribe
+                            /*mViewModel.currentACCList.apply {
                                 this.value?.addAll(it)
                                 this.postValue(this.value)
-                            }
+                            }*/
                         },
                         {
                             Log.e(
@@ -582,15 +844,15 @@ class MainActivity : AppCompatActivity() {
                     .subscribe(
                         {
                             //每150ms收到資料
-                            println("ericyu - MainActivity.ppg, onRecieved ${it.size}, mDataLock:${mDataLock}")
+                            println("ericyu - MainActivity.ppg, onRecieved ${it.size}")
 
                             if (!switch_record.isChecked) return@subscribe
-                            if (mDataLock) return@subscribe
-
-                            mViewModel.currentPPGList.apply {
-                                this.value?.addAll(it)
-                                this.postValue(this.value)
-                            }
+                            mViewModel.rawPPGList.postValue(it)
+                            //if (mDataLock) return@subscribe
+//                            mViewModel.currentPPGList.apply {
+//                            this.value?.addAll(it)
+//                                this.postValue(it)
+//                            }
 
                         },
                         {
@@ -611,7 +873,7 @@ class MainActivity : AppCompatActivity() {
                 super.ppiFeatureReady(identifier)
                 println("ericyu - MainActivity.ppiFeatureReady, identifier = [${identifier}]")
                 //取得PPI
-                tv_ppi_value.text = "Ready..."
+                //tv_ppi_value.text = "Ready..."
                 /*mPPIDisposable = mViewModel.polarApi.startOhrPPIStreaming(identifier)
                     .observeOn(Schedulers.io())
                     .map {
@@ -671,11 +933,11 @@ class MainActivity : AppCompatActivity() {
 
             override fun hrNotificationReceived(identifier: String, data: PolarHrData) {
                 super.hrNotificationReceived(identifier, data)
-                println("ericyu - MainActivity.hrNotificationReceived, identifier = [${identifier}], hr = [${data.hr}], mDataLock:${mDataLock}")
+                println("ericyu - MainActivity.hrNotificationReceived, identifier = [${identifier}], hr = [${data.hr}]")
                 //取得HR
                 tv_hr_value.text = "${data.hr}"
                 if (!switch_record.isChecked) return
-                if (mDataLock) return
+                //if (mDataLock) return
 
                 //TODO GoMoreEdgeKit.getActivityInfo 每秒呼叫, 取得float array 寫入DB
                 /*GoMoreEdgeKit.getActivityInfo(
@@ -683,12 +945,12 @@ class MainActivity : AppCompatActivity() {
                     floatArrayOf(data.hr.toFloat())
                 )*/
 
+                /* mViewModel.currentHRList.apply {
+                     this.value?.add(HREntity(hr = data.hr))
+                     this.postValue(this.value)
+                 }*/
 
-
-                mViewModel.currentHRList.apply {
-                    this.value?.add(HREntity(hr = data.hr))
-                    this.postValue(this.value)
-                }
+                mViewModel.rawHR.postValue(data.hr)
 
 
             }
@@ -698,74 +960,6 @@ class MainActivity : AppCompatActivity() {
                 println("ericyu - MainActivity.polarFtpFeatureReady, identifier = [${identifier}]")
             }
         })
-
-    }
-
-    override fun onResume() {
-        super.onResume()
-        println("ericyu - MainActivity.onResume")
-        mViewModel.polarApi.foregroundEntered()
-    }
-
-    override fun onPause() {
-        super.onPause()
-        println("ericyu - MainActivity.onPause")
-        mViewModel.polarApi.backgroundEntered()
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        println("ericyu - MainActivity.onDestroy")
-        mViewModel.polarApi.shutDown()
-        mWakeLock.release()
-    }
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-
-        mWakeLock.acquire(86400000)
-
-        //TODO 測試寫入GoMoreEdgeKit
-        GoMoreEdgeKit.initialize(this)
-        GMEdge.healthIndexInitUser(mViewModel.userInfo, 40f, 1609372799)
-
-        when {
-            (ContextCompat.checkSelfPermission(
-                this, Manifest.permission.ACCESS_COARSE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED) and
-                    (ContextCompat.checkSelfPermission(
-                        this, Manifest.permission.ACCESS_FINE_LOCATION
-                    ) == PackageManager.PERMISSION_GRANTED) and
-                    (ContextCompat.checkSelfPermission(
-                        this, Manifest.permission.WRITE_EXTERNAL_STORAGE
-                    ) == PackageManager.PERMISSION_GRANTED) and
-                    (ContextCompat.checkSelfPermission(
-                        this, Manifest.permission.READ_EXTERNAL_STORAGE
-                    ) == PackageManager.PERMISSION_GRANTED) -> {
-                println("ericyu - MainActivity.onCreate, permissions granted")
-
-            }
-
-            else -> {
-                requestPermissions(
-                    arrayOf(
-                        Manifest.permission.ACCESS_COARSE_LOCATION,
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                        Manifest.permission.READ_EXTERNAL_STORAGE,
-                    ), Companion.REQUEST_LOCATION_PERMISSIONS
-                )
-            }
-        }
-
-        //取得暫存device id
-        mSharedPreferences.getString(DEVICE_ID, "")?.takeIf { !it.isNullOrBlank() }?.run {
-            FirebaseCrashlytics.getInstance().setCustomKey("DeviceId", this)
-            edt_device.setText(this)
-        }
-
-        tv_version.text = "v${BuildConfig.VERSION_NAME}"
 
         //預設狀態
 //        btn_download.isEnabled = false
@@ -792,51 +986,79 @@ class MainActivity : AppCompatActivity() {
 
     //清除資料庫和暫存
     private fun clearCacheAndDatabase() {
-        lifecycleScope.launch(context = Dispatchers.IO) {
-            //RepositoryKit.clearAllTables()
-            RepositoryKit.clearAllTableEntries()
+        lifecycleScope.launch(Dispatchers.IO) {
+            mViewModel.clearAllTableEntries()
         }
         mViewModel.clearData()
         tv_hr_value.text = "--"
         tv_ppg_value.text = "--"
-        tv_ppi_value.text = "--"
+//        tv_ppi_value.text = "--"
         tv_acc_value.text = "--"
         tv_record_log.text = getString(R.string.records_log, 0, 0)
-        tv_sdk_value.text = "--"
+//        tv_sdk_value.text = "--"
         progress_file_output.progress = 0
         progress_file_output.max = 0
     }
 
-    private fun downloadFile() {
+    private fun downloadFile(totalRecord: Int) {
+        println("MainActivity.downloadFile , totalRecord = [${totalRecord}]")
+
+        /*lifecycleScope.launch(Dispatchers.IO) {
+
+            val batchCount = totalRecord / CSV_MAX_ROW
+            println("MainActivity.downloadFile, batchCount:$batchCount")
+            repeat(batchCount) { repeat ->
+
+                println("MainActivity.downloadFile, repeat:$repeat")
+
+                runBlocking {
+                    println("MainActivity.downloadFile $repeat runBlocking START")
+
+                    val job = async {
+
+                        val result = withContext(Dispatchers.IO) {
+                            mViewModel.queryRecordDetailByCountAsync(
+                                CSV_MAX_ROW,
+                                repeat * CSV_MAX_ROW
+                            )
+                        }
+
+                        withContext(Dispatchers.Main) {
+                            result.observe(this@MainActivity) {
+                                println("MainActivity.downloadFile, queryRecordDetailByCountAsync:${it.size} ${it.first().record.id}")
+                                //removeObservers(this@MainActivity)
+
+                            }
+                        }
+                    }
+
+                    job.await()
+
+                    println("MainActivity.downloadFile $repeat runBlocking END")
+
+                }
+
+            }
+
+        }*/
+
 
         lifecycleScope.launch(Dispatchers.Main) {
-            group_loading.isVisible = true
-            progress_file_output.progress = 0
-            progress_file_output.max = 0
-            tv_loading.text = "處理中"
-            progress_file_loading.isVisible = true
-            /*repeat(3) {
-                delay(1000)
-                tv_loading.text = "${tv_loading.text}."
-            }*/
 
-            RepositoryKit.queryRecordAndDetailAsync().apply {
+            mViewModel.queryAllRecordAsync().apply {
                 observe(this@MainActivity) {
-                    println("ericyu - MainActivity.downloadFile, result:${it.size}")
+                    println("MainActivity.downloadFile , queryAllRecordAsync:${it.size}")
                     removeObservers(this@MainActivity)
-                    //設定 loading progress max
-                    progress_file_output.max = it.size
-                    progress_file_loading.isVisible = false
-                    runBlocking {
-                        writeToCSV(it)
-                    }
+                    writeToCSV(it)
                 }
             }
+
         }
     }
 
 
-    private suspend fun writeToCSV(list: List<RecordAndDetail>) {
+    private fun writeToCSV(list: List<RecordEntity>) {
+        println("MainActivity.writeToCSV , list = [${list.size}]")
         lifecycleScope.launch(Dispatchers.IO) {
             var file: File? = null
             val filePath = this@MainActivity.filesDir.toString() + "/images/polar_data.csv"
@@ -846,40 +1068,70 @@ class MainActivity : AppCompatActivity() {
             }
             val fileUri =
                 FileProvider.getUriForFile(this@MainActivity, "polaroh1.fileprovider", file)
-
             csvWriter().openAsync(file) {
-                writeRow(listOf("TIMESTAMP", "HR", "PPG", "ACC_X", "ACC_Y", "ACC_Z"))
+                writeRow(
+                    listOf(
+                        "TIMESTAMP",
+                        "HR",
+                        "PPG1_LENGTH",
+                        "PPG1",
+                        "PPG2",
+                        "PPG3",
+                        "AMBIENT_1",
+                        "AMBIENT_2",
+                        "ACC_X",
+                        "ACC_Y",
+                        "ACC_Z"
+                    )
+                )
 
                 list.onEachIndexed { index, detail ->
 
                     writeRow(
                         listOf(
-                            detail.record.timestamp.time,
-                            "[${detail.hrList.joinToString()}]",
-                            "[${detail.ppgList.joinToString()}]",
-                            "[${detail.accXList.joinToString()}]",
-                            "[${detail.accYList.joinToString()}]",
-                            "[${detail.accZList.joinToString()}]"
+                            detail.timestamp.time,
+                            "[${detail.hrList.firstOrNull() ?: 0}]",
+                            "[${detail.ppg1List.size}]",
+                            "[${detail.ppg1List.joinToString().replace(PATTERN_WHITE_SPACE, "")}]",
+                            "[${detail.ppg2List.joinToString().replace(PATTERN_WHITE_SPACE, "")}]",
+                            "[${detail.ppg3List.joinToString().replace(PATTERN_WHITE_SPACE, "")}]",
+                            "[${
+                                detail.ambient1List.joinToString().replace(PATTERN_WHITE_SPACE, "")
+                            }]",
+                            "[${
+                                detail.ambient2List.joinToString().replace(PATTERN_WHITE_SPACE, "")
+                            }]",
+                            "[${detail.accXList.joinToString().replace(PATTERN_WHITE_SPACE, "")}]",
+                            "[${detail.accYList.joinToString().replace(PATTERN_WHITE_SPACE, "")}]",
+                            "[${detail.accZList.joinToString().replace(PATTERN_WHITE_SPACE, "")}]"
                         )
                     )
+
+
                     //顯示CSV格式轉換處理進度
                     withContext(Dispatchers.Main) {
                         progress_file_output.progress = index + 1
                         tv_loading.text =
                             "${progress_file_output.progress}/${progress_file_output.max}"
+                        progress_file_loading.isVisible =
+                            progress_file_output.progress != progress_file_output.max
                     }
                 }
             }
 
-            if (file.exists()) {
 
-                runOnUiThread {
+            if (file.exists()) {
+                withContext(Dispatchers.Main) {
+//                runOnUiThread {
                     group_loading.isVisible = false
                     val shareIntent: Intent = Intent().apply {
                         action = Intent.ACTION_SEND
                         putExtra(Intent.EXTRA_STREAM, fileUri)
                         val createtime =
-                            SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).run {
+                            SimpleDateFormat(
+                                "yyyy-MM-dd HH:mm:ss",
+                                Locale.getDefault()
+                            ).run {
                                 format(Date(System.currentTimeMillis()))
                             }
 //                        val createDate = createtime.split(" ").firstOrNull() ?: ""
@@ -896,33 +1148,11 @@ class MainActivity : AppCompatActivity() {
                     startActivity(Intent.createChooser(shareIntent, "分享檔案"))
 
                 }
-
             }
 
         }
+
     }
 
 }
-
-/*
-fun GoMoreEdgeKit.Kit.updatePPGRawExt(
-    currentTime: kotlin.Int,
-    stressSleepParam: com.bomdic.gomoreedgekit.StressSleepParam,
-    stressSleepResult: com.bomdic.gomoreedgekit.StressSleepResult
-): StressSleepResult? {
-
-//    println("ericyu - <top>.updatePPGRawExt, currentTime = [${currentTime}], ppgRaw1 = [${stressSleepParam}], hrArray = [${stressSleepParam.hrArray.size}], rmssdArray = [${stressSleepParam.rmssdArray.size}]")
-    return GoMoreEdgeKit.updatePPGRaw(currentTime, stressSleepParam, stressSleepResult)
-}
-*/
-
-fun GMEdge.Companion.getActivityInfoExt(
-    timestampList: IntArray,
-    hrList: IntArray
-): GMActivityInfo {
-    println("ericyu - <top>.getActivityInfoExt, timestampList = ${timestampList.toList()}, hrList = ${hrList.toList()}")
-    return getActivityInfo(timestampList, hrList)
-}
-
-
 

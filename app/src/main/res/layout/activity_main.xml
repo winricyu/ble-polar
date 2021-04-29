@@ -195,163 +195,104 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content">
 
+
+                <androidx.constraintlayout.helper.widget.Flow
+                    android:id="@+id/flow_raw_data"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:background="#EEEEEE"
+                    android:orientation="horizontal"
+                    app:constraint_referenced_ids="tv_hr,tv_hr_value,tv_ppg,tv_ppg_value,tv_acc,tv_acc_value"
+                    app:flow_horizontalGap="1dp"
+                    app:flow_horizontalStyle="packed"
+                    app:flow_maxElementsWrap="2"
+                    app:flow_verticalGap="1dp"
+                    app:flow_wrapMode="aligned"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent" />
+
+
+                <!--<androidx.constraintlayout.helper.widget.Flow
+                    android:id="@+id/flow_hr"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    app:constraint_referenced_ids="tv_hr,tv_hr_value"
+                    app:flow_horizontalGap="16dp" />
+
+                <androidx.constraintlayout.helper.widget.Flow
+                    android:id="@+id/flow_ppg"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    app:constraint_referenced_ids="tv_ppg,tv_ppg_value"
+                    app:flow_horizontalGap="16dp" />
+
+                <androidx.constraintlayout.helper.widget.Flow
+                    android:id="@+id/flow_acc"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    app:constraint_referenced_ids="tv_acc,tv_acc_value"
+                    app:flow_horizontalGap="16dp" />
+-->
                 <TextView
                     android:id="@+id/tv_hr"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:background="@color/white"
                     android:text="HR"
                     android:textSize="20sp"
                     android:textStyle="bold"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toTopOf="parent" />
-
-                <TextView
-                    android:id="@+id/tv_hr_value"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp"
-                    android:text="--"
-                    android:textSize="20sp"
-                    app:layout_constraintBaseline_toBaselineOf="@+id/tv_hr"
-                    app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintStart_toEndOf="@+id/barrier_title" />
-
-                <TextView
-                    android:id="@+id/tv_ppg_value"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp"
-                    android:text="--"
-                    android:textSize="20sp"
-                    app:layout_constraintBaseline_toBaselineOf="@+id/tv_ppg"
-                    app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintStart_toEndOf="@+id/barrier_title" />
-
-                <TextView
-                    android:id="@+id/tv_ppi_value"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp"
-                    android:text="--"
-                    android:textSize="20sp"
-                    app:layout_constraintBaseline_toBaselineOf="@+id/tv_ppi"
-                    app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintHorizontal_bias="0.0"
-                    app:layout_constraintStart_toEndOf="@+id/barrier_title" />
-
-                <TextView
-                    android:id="@+id/tv_acc_value"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp"
-                    android:text="--"
-                    android:textSize="20sp"
-                    app:layout_constraintBaseline_toBaselineOf="@+id/tv_acc"
-                    app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintHorizontal_bias="1.0"
-                    app:layout_constraintStart_toEndOf="@+id/barrier_title" />
-
+                    app:layout_constraintHorizontal_weight="1" />
 
                 <TextView
                     android:id="@+id/tv_ppg"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
+                    android:background="@color/white"
                     android:text="PPG"
                     android:textSize="20sp"
-                    android:textStyle="bold"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toBottomOf="@+id/barrier_hr" />
+                    android:textStyle="bold" />
 
-                <TextView
-                    android:id="@+id/tv_ppi"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:text="PPI"
-                    android:textSize="20sp"
-                    android:textStyle="bold"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toBottomOf="@+id/barrier_ppg" />
 
                 <TextView
                     android:id="@+id/tv_acc"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
+                    android:background="@color/white"
                     android:text="ACC"
                     android:textSize="20sp"
-                    android:textStyle="bold"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toBottomOf="@+id/barrier_ppi" />
+                    android:textStyle="bold" />
+
 
                 <TextView
-                    android:id="@+id/tv_sdk"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:text="SDK"
-                    android:textSize="20sp"
-                    android:textStyle="bold"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toBottomOf="@id/barrier_acc" />
-
-                <TextView
-                    android:id="@+id/tv_sdk_value"
+                    android:id="@+id/tv_hr_value"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp"
+                    android:background="@color/white"
                     android:text="--"
                     android:textSize="20sp"
-                    app:layout_constraintBaseline_toBaselineOf="@+id/tv_sdk"
-                    app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintHorizontal_bias="1.0"
-                    app:layout_constraintStart_toEndOf="@+id/barrier_title" />
+                    app:layout_constraintHorizontal_weight="4" />
 
-                <androidx.constraintlayout.widget.Barrier
-                    android:id="@+id/barrier_title"
-                    android:layout_width="wrap_content"
+                <TextView
+                    android:id="@+id/tv_ppg_value"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    app:barrierDirection="end"
-                    app:constraint_referenced_ids="tv_hr,tv_ppg,tv_ppi,tv_acc,tv_sdk" />
+                    android:background="@color/white"
+                    android:text="--"
+                    android:textSize="20sp" />
 
-                <androidx.constraintlayout.widget.Barrier
-                    android:id="@+id/barrier_hr"
-                    android:layout_width="wrap_content"
+
+                <TextView
+                    android:id="@+id/tv_acc_value"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    app:barrierDirection="bottom"
-                    app:constraint_referenced_ids="tv_hr,tv_hr_value" />
-
-                <androidx.constraintlayout.widget.Barrier
-                    android:id="@+id/barrier_ppg"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    app:barrierDirection="bottom"
-                    app:constraint_referenced_ids="tv_ppg,tv_ppg_value" />
-
-
-                <androidx.constraintlayout.widget.Barrier
-                    android:id="@+id/barrier_ppi"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    app:barrierDirection="bottom"
-                    app:constraint_referenced_ids="tv_ppi,tv_ppi_value" />
-
-
-                <androidx.constraintlayout.widget.Barrier
-                    android:id="@+id/barrier_sdk"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    app:barrierDirection="bottom"
-                    app:constraint_referenced_ids="tv_sdk,tv_sdk_value" />
-
-
-                <androidx.constraintlayout.widget.Barrier
-                    android:id="@+id/barrier_acc"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    app:barrierDirection="bottom"
-                    app:constraint_referenced_ids="tv_acc,tv_acc_value" />
+                    android:background="@color/white"
+                    android:text="--"
+                    android:textSize="20sp" />
 
 
             </androidx.constraintlayout.widget.ConstraintLayout>
