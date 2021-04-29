@@ -1079,7 +1079,6 @@ class MainActivity : AppCompatActivity() {
                         "PPG_2",
                         "PPG_3",
                         "AMBIENT_1",
-                        "AMBIENT_2",
                         "ACC_X",
                         "ACC_Y",
                         "ACC_Z"
@@ -1096,12 +1095,7 @@ class MainActivity : AppCompatActivity() {
                             "[${detail.ppg1List.joinToString().replace(PATTERN_WHITE_SPACE, "")}]",
                             "[${detail.ppg2List.joinToString().replace(PATTERN_WHITE_SPACE, "")}]",
                             "[${detail.ppg3List.joinToString().replace(PATTERN_WHITE_SPACE, "")}]",
-                            "[${
-                                detail.ambient1List.joinToString().replace(PATTERN_WHITE_SPACE, "")
-                            }]",
-                            "[${
-                                detail.ambient2List.joinToString().replace(PATTERN_WHITE_SPACE, "")
-                            }]",
+                            "[${detail.ambient1List.joinToString().replace(PATTERN_WHITE_SPACE, "")}]",
                             "[${detail.accXList.joinToString().replace(PATTERN_WHITE_SPACE, "")}]",
                             "[${detail.accYList.joinToString().replace(PATTERN_WHITE_SPACE, "")}]",
                             "[${detail.accZList.joinToString().replace(PATTERN_WHITE_SPACE, "")}]"
