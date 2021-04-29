@@ -1061,7 +1061,8 @@ class MainActivity : AppCompatActivity() {
         println("MainActivity.writeToCSV , list = [${list.size}]")
         lifecycleScope.launch(Dispatchers.IO) {
             var file: File? = null
-            val filePath = this@MainActivity.filesDir.toString() + "/images/polar_data.csv"
+            val filePath = this@MainActivity.cacheDir.toString() + "/csv_cache/polar_data.csv"
+//            val filePath = this@MainActivity.filesDir.toString() + "/images/polar_data.csv"
             file = File(filePath)
             if (!file.parentFile.exists()) {
                 file.parentFile.mkdir()
