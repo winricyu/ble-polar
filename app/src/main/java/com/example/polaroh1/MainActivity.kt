@@ -1074,10 +1074,10 @@ class MainActivity : AppCompatActivity() {
                     listOf(
                         "TIMESTAMP",
                         "HR",
-                        "PPG1_LENGTH",
-                        "PPG1",
-                        "PPG2",
-                        "PPG3",
+                        //"PPG_1_LENGTH",
+                        "PPG_1",
+                        "PPG_2",
+                        "PPG_3",
                         "AMBIENT_1",
                         "AMBIENT_2",
                         "ACC_X",
@@ -1092,7 +1092,7 @@ class MainActivity : AppCompatActivity() {
                         listOf(
                             detail.timestamp.time,
                             "[${detail.hrList.firstOrNull() ?: 0}]",
-                            "[${detail.ppg1List.size}]",
+                            //"[${detail.ppg1List.size}]",
                             "[${detail.ppg1List.joinToString().replace(PATTERN_WHITE_SPACE, "")}]",
                             "[${detail.ppg2List.joinToString().replace(PATTERN_WHITE_SPACE, "")}]",
                             "[${detail.ppg3List.joinToString().replace(PATTERN_WHITE_SPACE, "")}]",
