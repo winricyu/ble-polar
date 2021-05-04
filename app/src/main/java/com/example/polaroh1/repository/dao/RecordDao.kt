@@ -37,6 +37,9 @@ interface RecordDao {
     @Query("SELECT * FROM RECORD ORDER BY id ASC LIMIT :limit OFFSET :offset")
     fun queryRecordByCountAsync(limit: Int, offset: Int): LiveData<List<RecordEntity>>
 
+    @Query("SELECT * FROM RECORD ORDER BY id ASC LIMIT :limit OFFSET :offset")
+    fun queryRecordByCount(limit: Int, offset: Int): List<RecordEntity>
+
     /*@Transaction
     @Query("SELECT * FROM RECORD")
     fun queryRecordAndDetailAsync(): LiveData<List<RecordAndDetail>>*/

@@ -7,6 +7,9 @@ import com.bomdic.gomoreedgekit.data.GMUserInfo
 import com.example.polaroh1.repository.RepositoryKit
 import com.example.polaroh1.repository.entity.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.channels.produce
 import kotlinx.coroutines.withContext
 import polar.com.sdk.api.PolarBleApi
 import polar.com.sdk.api.PolarBleApiDefaultImpl
@@ -80,8 +83,22 @@ class MainViewModel(private val mContext: Application) : AndroidViewModel(mConte
         return RepositoryKit.queryRecordDetailByCountAsync(limit,offset)
     }*/
 
+
+    suspend fun queryRecordByCountAsync(limit: Int, offset: Int): LiveData<List<RecordEntity>> {
+        return withContext(Dispatchers.IO) {
+            RepositoryKit.queryRecordByCountAsync(limit, offset)
+        }
+    }
+
+    suspend fun queryRecordByCount(limit: Int, offset: Int): List<RecordEntity> {
+        println("MainViewModel.queryRecordByCount , limit = [${limit}], offset = [${offset}]")
+        return withContext(Dispatchers.IO) {
+            RepositoryKit.queryRecordByCount(limit, offset)
+        }
+    }
+
     suspend fun queryAllRecordAsync(): LiveData<List<RecordEntity>> {
-        return   withContext(Dispatchers.IO){
+        return withContext(Dispatchers.IO) {
             RepositoryKit.queryAllRecordsAsync()
         }
     }
@@ -93,6 +110,10 @@ class MainViewModel(private val mContext: Application) : AndroidViewModel(mConte
         currentACCList.value?.clear()
         deviceDisconnectCounts.value?.clear()
     }
+
+    var recordChannel: ReceiveChannel<List<RecordEntity>>?=null
+
+
 }
 
 class MainViewModelFactory(private val mContext: Application) :

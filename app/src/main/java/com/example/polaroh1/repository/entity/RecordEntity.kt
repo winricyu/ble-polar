@@ -9,7 +9,7 @@ import java.util.*
 
 @Entity(tableName = "RECORD")
 @TypeConverters(
-    DateConverter::class,IntListConverter::class
+    DateConverter::class, IntListConverter::class
 )
 data class RecordEntity(
     @PrimaryKey(autoGenerate = true)
@@ -24,5 +24,4 @@ data class RecordEntity(
     var accXList: List<Int> = listOf(),
     var accYList: List<Int> = listOf(),
     var accZList: List<Int> = listOf(),
-    var ppg1:Int=0
 )

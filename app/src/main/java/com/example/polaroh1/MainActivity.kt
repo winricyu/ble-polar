@@ -2,7 +2,6 @@ package com.example.polaroh1
 
 import android.Manifest
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.*
 import android.text.InputFilter
@@ -32,6 +31,7 @@ import io.reactivex.rxjava3.functions.Function
 import io.reactivex.rxjava3.schedulers.Schedulers
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.*
 import kotlinx.coroutines.sync.Semaphore
 import org.reactivestreams.Publisher
 import polar.com.sdk.api.PolarBleApiCallback
@@ -49,7 +49,7 @@ class MainActivity : AppCompatActivity() {
         private const val REQUEST_LOCATION_PERMISSIONS = 11
         private const val MAX_LENGTH = 8
         private const val DEVICE_ID = "DEVICE_ID"
-        private const val CSV_MAX_ROW = 100
+        private const val CSV_MAX_ROW = 30
         private val PATTERN_WHITE_SPACE = "\\s".toRegex()
     }
 
@@ -90,27 +90,9 @@ class MainActivity : AppCompatActivity() {
             observe(this@MainActivity) {
                 println("MainActivity.queryRecordCountAsync analyzeRecords ${it}")
                 removeObservers(this@MainActivity)
-                tv_record_log.text = getString(
-                    R.string.records_log,
-                    it,
-                    mViewModel.deviceDisconnectCounts.value?.size ?: 0
-                )
+                tv_record_log.text = getString(R.string.records_log, it)
             }
         }
-        /*lifecycleScope.launch(Dispatchers.IO) {
-
-            RepositoryKit.queryAllRecords().run {
-
-                runOnUiThread {
-                    tv_record_log.text = getString(
-                        R.string.records_log,
-                        this.size,
-                        mViewModel.deviceDisconnectCounts.value?.size ?: 0
-                    )
-
-                }
-            }
-        }*/
     }
 
 
@@ -294,12 +276,10 @@ class MainActivity : AppCompatActivity() {
                         try {
                             mPPGSemaphore.acquire()
                             mViewModel.currentPPGList.value?.apply {
-                                recordEntity.ppg1 = this.size
                                 recordEntity.ppg1List = this.map { it.ppg0 }
                                 recordEntity.ppg2List = this.map { it.ppg1 }
                                 recordEntity.ppg3List = this.map { it.ppg2 }
                                 recordEntity.ambient1List = this.map { it.ambient }
-                                recordEntity.ambient2List = this.map { it.ambient2 }
                                 clear()
                             }
                         } finally {
@@ -994,7 +974,7 @@ class MainActivity : AppCompatActivity() {
         tv_ppg_value.text = "--"
 //        tv_ppi_value.text = "--"
         tv_acc_value.text = "--"
-        tv_record_log.text = getString(R.string.records_log, 0, 0)
+        tv_record_log.text = getString(R.string.records_log, 0)
 //        tv_sdk_value.text = "--"
         progress_file_output.progress = 0
         progress_file_output.max = 0
@@ -1003,47 +983,48 @@ class MainActivity : AppCompatActivity() {
     private fun downloadFile(totalRecord: Int) {
         println("MainActivity.downloadFile , totalRecord = [${totalRecord}]")
 
-        /*lifecycleScope.launch(Dispatchers.IO) {
+        runBlocking {
+            lifecycleScope.launch(Dispatchers.IO) {
+                val batchCount = totalRecord / CSV_MAX_ROW
+                println("MainActivity.downloadFile, batchCount:$batchCount")
+                var repeat = 0
 
-            val batchCount = totalRecord / CSV_MAX_ROW
-            println("MainActivity.downloadFile, batchCount:$batchCount")
-            repeat(batchCount) { repeat ->
+                mViewModel.recordChannel =
+                    lifecycleScope.produce(Dispatchers.IO) {
 
-                println("MainActivity.downloadFile, repeat:$repeat")
+                        println("MainActivity.downloadFile, recordChannel")
 
-                runBlocking {
-                    println("MainActivity.downloadFile $repeat runBlocking START")
+                        while (repeat <= batchCount) {
+                            println("MainActivity.downloadFile, repeat:$repeat")
+                            delay(500)
+                            val result =
+                                withContext(Dispatchers.IO) {
 
-                    val job = async {
+                                    mViewModel.queryRecordByCount(
+                                        CSV_MAX_ROW,
+                                        repeat * CSV_MAX_ROW
+                                    )
+                                }
+                            repeat++
+                            //println("MainActivity.downloadFile, result:${result.size}")
+                            send(result)
 
-                        val result = withContext(Dispatchers.IO) {
-                            mViewModel.queryRecordDetailByCountAsync(
-                                CSV_MAX_ROW,
-                                repeat * CSV_MAX_ROW
-                            )
-                        }
-
-                        withContext(Dispatchers.Main) {
-                            result.observe(this@MainActivity) {
-                                println("MainActivity.downloadFile, queryRecordDetailByCountAsync:${it.size} ${it.first().record.id}")
-                                //removeObservers(this@MainActivity)
-
-                            }
                         }
                     }
 
-                    job.await()
-
-                    println("MainActivity.downloadFile $repeat runBlocking END")
-
+                for (index in 0..batchCount) {
+                    println("MainActivity.downloadFile, consumeEach: $index")
+                    mViewModel.recordChannel?.receiveOrNull()?.apply {
+                        writeToCSV(this, index)
+                    }
                 }
-
             }
 
-        }*/
+
+        }
 
 
-        lifecycleScope.launch(Dispatchers.Main) {
+        /*lifecycleScope.launch(Dispatchers.Main) {
 
             mViewModel.queryAllRecordAsync().apply {
                 observe(this@MainActivity) {
@@ -1053,15 +1034,16 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-        }
+        }*/
     }
 
 
-    private fun writeToCSV(list: List<RecordEntity>) {
-        println("MainActivity.writeToCSV , list = [${list.size}]")
-        lifecycleScope.launch(Dispatchers.IO) {
+    private suspend fun writeToCSV(list: List<RecordEntity>, repeat: Int) {
+        println("MainActivity.writeToCSV , list = [${list.size}], repeat = [${repeat}]")
+        withContext(Dispatchers.IO) {
             var file: File? = null
-            val filePath = this@MainActivity.cacheDir.toString() + "/csv_cache/polar_data.csv"
+            val filePath =
+                this@MainActivity.cacheDir.toString() + "/csv_cache/polar_data_$repeat.csv"
 //            val filePath = this@MainActivity.filesDir.toString() + "/images/polar_data.csv"
             file = File(filePath)
             if (!file.parentFile.exists()) {
@@ -1074,7 +1056,6 @@ class MainActivity : AppCompatActivity() {
                     listOf(
                         "TIMESTAMP",
                         "HR",
-                        //"PPG_1_LENGTH",
                         "PPG_1",
                         "PPG_2",
                         "PPG_3",
@@ -1085,17 +1066,18 @@ class MainActivity : AppCompatActivity() {
                     )
                 )
 
-                list.onEachIndexed { index, detail ->
+                list.onEachIndexed { _, detail ->
 
                     writeRow(
                         listOf(
                             detail.timestamp.time,
                             "[${detail.hrList.firstOrNull() ?: 0}]",
-                            //"[${detail.ppg1List.size}]",
                             "[${detail.ppg1List.joinToString().replace(PATTERN_WHITE_SPACE, "")}]",
                             "[${detail.ppg2List.joinToString().replace(PATTERN_WHITE_SPACE, "")}]",
                             "[${detail.ppg3List.joinToString().replace(PATTERN_WHITE_SPACE, "")}]",
-                            "[${detail.ambient1List.joinToString().replace(PATTERN_WHITE_SPACE, "")}]",
+                            "[${
+                                detail.ambient1List.joinToString().replace(PATTERN_WHITE_SPACE, "")
+                            }]",
                             "[${detail.accXList.joinToString().replace(PATTERN_WHITE_SPACE, "")}]",
                             "[${detail.accYList.joinToString().replace(PATTERN_WHITE_SPACE, "")}]",
                             "[${detail.accZList.joinToString().replace(PATTERN_WHITE_SPACE, "")}]"
@@ -1105,7 +1087,8 @@ class MainActivity : AppCompatActivity() {
 
                     //顯示CSV格式轉換處理進度
                     withContext(Dispatchers.Main) {
-                        progress_file_output.progress = index + 1
+                        progress_file_output.progress += 1//index + 1
+                        println("MainActivity.writeToCSV, progress:${progress_file_output.progress}")
                         tv_loading.text =
                             "${progress_file_output.progress}/${progress_file_output.max}"
                         progress_file_loading.isVisible =
@@ -1114,10 +1097,12 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
+            println("MainActivity.writeToCSV, file:$file")
 
-            if (file.exists()) {
+
+            /*if (file.exists()) {
                 withContext(Dispatchers.Main) {
-//                runOnUiThread {
+    //                runOnUiThread {
                     group_loading.isVisible = false
                     val shareIntent: Intent = Intent().apply {
                         action = Intent.ACTION_SEND
@@ -1129,7 +1114,7 @@ class MainActivity : AppCompatActivity() {
                             ).run {
                                 format(Date(System.currentTimeMillis()))
                             }
-//                        val createDate = createtime.split(" ").firstOrNull() ?: ""
+    //                        val createDate = createtime.split(" ").firstOrNull() ?: ""
                         putExtra(
                             Intent.EXTRA_SUBJECT,
                             "PolarOH1 [${edt_device.text.toString() ?: ""}] ${
@@ -1143,7 +1128,7 @@ class MainActivity : AppCompatActivity() {
                     startActivity(Intent.createChooser(shareIntent, "分享檔案"))
 
                 }
-            }
+            }*/
 
         }
 

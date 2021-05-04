@@ -64,6 +64,8 @@ object RepositoryKit {
     fun queryAllACC() = databaseManager.getACCDao().queryAll()
     fun queryRecordByCountAsync(limit: Int, offset: Int) =
         databaseManager.getRecordDao().queryRecordByCountAsync(limit, offset)
+    suspend fun queryRecordByCount(limit: Int, offset: Int) =
+        databaseManager.getRecordDao().queryRecordByCount(limit, offset)
     //fun queryRecordAndDetailAsync() = databaseManager.getRecordDao().queryRecordAndDetailAsync()
 
     /* fun queryRecordDetailByCountAsync(limit: Int, offset: Int) =
