@@ -312,7 +312,7 @@ class MainActivity : AppCompatActivity() {
                             mViewModel.currentACCList.value?.apply {
                                 recordEntity.accXList = this.map { it.x }
                                 recordEntity.accYList = this.map { it.y }
-                                recordEntity.accXList = this.map { it.z }
+                                recordEntity.accZList = this.map { it.z }
                                 clear()
                             }
                         } finally {
