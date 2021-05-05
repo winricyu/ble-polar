@@ -1,8 +1,11 @@
 package com.example.polaroh1
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.*
 import android.text.InputFilter
 import android.util.Log
@@ -21,6 +24,7 @@ import androidx.lifecycle.lifecycleScope
 import com.bomdic.gomoreedgekit.GMEdge
 import com.bomdic.gomoreedgekit.GoMoreEdgeKit
 import com.bomdic.gomoreedgekit.data.GMPPGRaw
+import com.example.polaroh1.repository.RepositoryKit
 import com.example.polaroh1.repository.entity.*
 import com.example.polaroh1.utils.MainViewModel
 import com.example.polaroh1.utils.MainViewModelFactory
@@ -49,8 +53,11 @@ class MainActivity : AppCompatActivity() {
         private const val REQUEST_LOCATION_PERMISSIONS = 11
         private const val MAX_LENGTH = 8
         private const val DEVICE_ID = "DEVICE_ID"
-        private const val CSV_MAX_ROW = 30
+        private const val CSV_MAX_ROW = 3600
+        private const val FILE_EXPORT_REQUEST_CODE = 123
+        private val DATE_FORMAT = SimpleDateFormat("MMdd")
         private val PATTERN_WHITE_SPACE = "\\s".toRegex()
+
     }
 
     private val mViewModel by lazy {
@@ -636,8 +643,26 @@ class MainActivity : AppCompatActivity() {
         }
 
         btn_clear.setOnClickListener {
+            lifecycleScope.launch(Dispatchers.IO) {
+                val records = RepositoryKit.queryRecordByCount(10, 0)
+                val new = RecordEntity()
+                records.last().apply {
+                    new.hrList = hrList
+                    new.ppg1List=ppg1List
+                    new.ppg2List=ppg2List
+                    new.ppg3List=ppg3List
+                    new.ambient1List=ambient1List
+                    new.accXList=accXList
+                    new.accYList=accYList
+                    new.accZList=accZList
+                }
+                for (i in 1..28800) {
 
-            lifecycleScope.launch {
+                    RepositoryKit.insertRecord(new)
+                }
+            }
+
+            /*lifecycleScope.launch {
                 AlertDialog.Builder(this@MainActivity)
                     .setTitle("警告")
                     .setMessage("所有資料將被刪除且無法復原")
@@ -654,7 +679,7 @@ class MainActivity : AppCompatActivity() {
                         println("ericyu - MainActivity.setPositiveButton, $which")
                         dialog.dismiss()
                     }.show()
-            }
+            }*/
         }
 
         btn_download.setOnClickListener {
@@ -670,12 +695,15 @@ class MainActivity : AppCompatActivity() {
 
 
                     group_loading.isVisible = true
-                    progress_file_output.progress = 0
-                    progress_file_output.max = it
+                    /*progress_file_output.progress = 0
+                    progress_file_output.max = it*/
                     tv_loading.text = "處理中"
                     progress_file_loading.isVisible = true
 
-
+                    //
+//                    println("MainActivity.onCreate, Environment:${Environment.getExternalStorageState()}")
+                    //saveFile()
+//                    createFile(Uri.fromFile())
                     downloadFile(it)
                 }
             }
@@ -982,11 +1010,17 @@ class MainActivity : AppCompatActivity() {
 
     private fun downloadFile(totalRecord: Int) {
         println("MainActivity.downloadFile , totalRecord = [${totalRecord}]")
+        mViewModel.exportBatchCount = 0
+        mViewModel.exportFileCount = 0
+        progress_file_output.progress = 0
+        progress_file_output.max = 0
 
         runBlocking {
             lifecycleScope.launch(Dispatchers.IO) {
-                val batchCount = totalRecord / CSV_MAX_ROW
-                println("MainActivity.downloadFile, batchCount:$batchCount")
+                mViewModel.exportBatchCount = totalRecord / CSV_MAX_ROW
+                progress_file_output.max= mViewModel.exportBatchCount+1
+
+                println("MainActivity.downloadFile, batchCount:${mViewModel.exportBatchCount}")
                 var repeat = 0
 
                 mViewModel.recordChannel =
@@ -994,7 +1028,7 @@ class MainActivity : AppCompatActivity() {
 
                         println("MainActivity.downloadFile, recordChannel")
 
-                        while (repeat <= batchCount) {
+                        while (repeat <= mViewModel.exportBatchCount) {
                             println("MainActivity.downloadFile, repeat:$repeat")
                             delay(500)
                             val result =
@@ -1012,12 +1046,15 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
 
-                for (index in 0..batchCount) {
-                    println("MainActivity.downloadFile, consumeEach: $index")
-                    mViewModel.recordChannel?.receiveOrNull()?.apply {
-                        writeToCSV(this, index)
-                    }
-                }
+                saveFile("PolarOH1_${DATE_FORMAT.format(Date())}_${mViewModel.exportFileCount+1}.csv")
+
+                /* for (index in 0..batchCount) {
+                     println("MainActivity.downloadFile, consumeEach: $index")
+                     mViewModel.recordChannel?.receiveOrNull()?.apply {
+                         //writeToCSV(this, index)
+                         saveFile("polaroh1_data_$index.csv")
+                     }
+                 }*/
             }
 
 
@@ -1042,6 +1079,7 @@ class MainActivity : AppCompatActivity() {
         println("MainActivity.writeToCSV , list = [${list.size}], repeat = [${repeat}]")
         withContext(Dispatchers.IO) {
             var file: File? = null
+//            val filePath = this@MainActivity.getExternalFilesDir().toString() + "/csv_cache/polar_data_$repeat.csv"
             val filePath =
                 this@MainActivity.cacheDir.toString() + "/csv_cache/polar_data_$repeat.csv"
 //            val filePath = this@MainActivity.filesDir.toString() + "/images/polar_data.csv"
@@ -1049,8 +1087,12 @@ class MainActivity : AppCompatActivity() {
             if (!file.parentFile.exists()) {
                 file.parentFile.mkdir()
             }
+
+
             val fileUri =
                 FileProvider.getUriForFile(this@MainActivity, "polaroh1.fileprovider", file)
+
+/*
             csvWriter().openAsync(file) {
                 writeRow(
                     listOf(
@@ -1088,7 +1130,6 @@ class MainActivity : AppCompatActivity() {
                     //顯示CSV格式轉換處理進度
                     withContext(Dispatchers.Main) {
                         progress_file_output.progress += 1//index + 1
-                        println("MainActivity.writeToCSV, progress:${progress_file_output.progress}")
                         tv_loading.text =
                             "${progress_file_output.progress}/${progress_file_output.max}"
                         progress_file_loading.isVisible =
@@ -1097,7 +1138,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            println("MainActivity.writeToCSV, file:$file")
+            println("MainActivity.writeToCSV, file:$file")*/
 
 
             /*if (file.exists()) {
@@ -1134,5 +1175,118 @@ class MainActivity : AppCompatActivity() {
 
     }
 
+    private suspend fun writeCSV(documentUri: Uri, list: List<RecordEntity>?) {
+        println("MainActivity.writeCSV , documentUri = [${documentUri}], list = [${list?.size}] ,last:${list?.lastOrNull()?.id}")
+        if (list.isNullOrEmpty()) return
+        withContext(Dispatchers.IO) {
+
+            val outputStream = this@MainActivity.contentResolver?.openOutputStream(documentUri)
+                ?: return@withContext
+
+            println("MainActivity.writeCSV START")
+            csvWriter().openAsync(outputStream) {
+                writeRow(
+                    listOf(
+                        "TIMESTAMP",
+                        "HR",
+                        "PPG_1",
+                        "PPG_2",
+                        "PPG_3",
+                        "AMBIENT_1",
+                        "ACC_X",
+                        "ACC_Y",
+                        "ACC_Z"
+                    )
+                )
+
+                list.onEachIndexed { _, detail ->
+
+                    writeRow(
+                        listOf(
+                            detail.timestamp.time,
+                            "[${detail.hrList.firstOrNull() ?: 0}]",
+                            "[${detail.ppg1List.joinToString().replace(PATTERN_WHITE_SPACE, "")}]",
+                            "[${detail.ppg2List.joinToString().replace(PATTERN_WHITE_SPACE, "")}]",
+                            "[${detail.ppg3List.joinToString().replace(PATTERN_WHITE_SPACE, "")}]",
+                            "[${
+                                detail.ambient1List.joinToString().replace(PATTERN_WHITE_SPACE, "")
+                            }]",
+                            "[${detail.accXList.joinToString().replace(PATTERN_WHITE_SPACE, "")}]",
+                            "[${detail.accYList.joinToString().replace(PATTERN_WHITE_SPACE, "")}]",
+                            "[${detail.accZList.joinToString().replace(PATTERN_WHITE_SPACE, "")}]"
+                        )
+                    )
+
+                    //顯示CSV格式轉換處理進度
+                    /*withContext(Dispatchers.Main) {
+                        progress_file_output.progress += 1
+                        tv_loading.text =
+                            "${progress_file_output.progress}/${progress_file_output.max}"
+                        progress_file_loading.isVisible =
+                            progress_file_output.progress != progress_file_output.max
+                    }*/
+
+                }
+
+
+            }
+            println("MainActivity.writeCSV END")
+
+            //顯示CSV格式轉換處理進度
+            withContext(Dispatchers.Main) {
+                progress_file_output.progress =  mViewModel.exportFileCount+1
+                tv_loading.text = "${progress_file_output.progress}/${progress_file_output.max}"
+                progress_file_loading.isVisible = progress_file_output.progress != progress_file_output.max
+            }
+
+            mViewModel.exportFileCount++
+            if (mViewModel.exportFileCount <= mViewModel.exportBatchCount) {
+                saveFile("PolarOH1_${DATE_FORMAT.format(Date())}_${mViewModel.exportFileCount+1}.csv")
+            }
+
+
+
+        }
+
+    }
+
+    private fun saveFile(fileName: String) {
+        println("MainActivity.saveFile , fileName = [${fileName}]")
+        val exportIntent = Intent(Intent.ACTION_CREATE_DOCUMENT)
+        exportIntent.addCategory(Intent.CATEGORY_OPENABLE)
+        exportIntent.type = "text/csv"
+        exportIntent.putExtra(Intent.EXTRA_TITLE, fileName)
+        startActivityForResult(exportIntent, FILE_EXPORT_REQUEST_CODE)
+    }
+
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        println("MainActivity.onActivityResult , requestCode = [${requestCode}], resultCode = [${resultCode}], data = [${data?.data}]")
+
+        if ((requestCode == FILE_EXPORT_REQUEST_CODE) and (resultCode == Activity.RESULT_OK)) {
+
+            data?.data?.apply fileUri@{
+                lifecycleScope.launch(Dispatchers.IO) {
+                    contentResolver.takePersistableUriPermission(
+                        this@fileUri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+
+                    mViewModel.recordChannel?.receiveOrNull()?.apply {
+                        println("MainActivity.onActivityResult receiveOrNull:${this.size}, ${mViewModel.exportFileCount}/${mViewModel.exportBatchCount}")
+                       /* mViewModel.exportFileCount++
+                        if (mViewModel.exportFileCount <= mViewModel.exportBatchCount) {
+                            saveFile("PolarOH1_${DATE_FORMAT.format(Date())}_${mViewModel.exportFileCount}.csv")
+                        }*/
+                        writeCSV(this@fileUri, this)
+                    }
+
+                }
+            }
+        }
+
+
+    }
 }
 

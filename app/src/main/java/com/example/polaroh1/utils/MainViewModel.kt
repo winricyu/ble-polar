@@ -112,6 +112,9 @@ class MainViewModel(private val mContext: Application) : AndroidViewModel(mConte
     }
 
     var recordChannel: ReceiveChannel<List<RecordEntity>>?=null
+//    val tempRecords= mutableListOf<RecordEntity>()
+    var exportBatchCount= 0
+    var exportFileCount= 0
 
 
 }
