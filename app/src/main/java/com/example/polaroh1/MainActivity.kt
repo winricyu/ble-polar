@@ -41,10 +41,13 @@ import org.reactivestreams.Publisher
 import polar.com.sdk.api.PolarBleApiCallback
 import polar.com.sdk.api.model.*
 import java.io.File
+import java.math.MathContext
+import java.math.RoundingMode
 import java.text.SimpleDateFormat
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.*
+import kotlin.math.roundToInt
 
 
 class MainActivity : AppCompatActivity() {
@@ -643,26 +646,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         btn_clear.setOnClickListener {
-            lifecycleScope.launch(Dispatchers.IO) {
-                val records = RepositoryKit.queryRecordByCount(10, 0)
-                val new = RecordEntity()
-                records.last().apply {
-                    new.hrList = hrList
-                    new.ppg1List=ppg1List
-                    new.ppg2List=ppg2List
-                    new.ppg3List=ppg3List
-                    new.ambient1List=ambient1List
-                    new.accXList=accXList
-                    new.accYList=accYList
-                    new.accZList=accZList
-                }
-                for (i in 1..28800) {
 
-                    RepositoryKit.insertRecord(new)
-                }
-            }
 
-            /*lifecycleScope.launch {
+            lifecycleScope.launch {
                 AlertDialog.Builder(this@MainActivity)
                     .setTitle("警告")
                     .setMessage("所有資料將被刪除且無法復原")
@@ -679,7 +665,7 @@ class MainActivity : AppCompatActivity() {
                         println("ericyu - MainActivity.setPositiveButton, $which")
                         dialog.dismiss()
                     }.show()
-            }*/
+            }
         }
 
         btn_download.setOnClickListener {
@@ -1015,10 +1001,13 @@ class MainActivity : AppCompatActivity() {
         progress_file_output.progress = 0
         progress_file_output.max = 0
 
+        val fileRecordLimit= edt_export.text.toString().toIntOrNull()?:CSV_MAX_ROW
+        println("MainActivity.downloadFile, fileRecordLimit:$fileRecordLimit")
         runBlocking {
             lifecycleScope.launch(Dispatchers.IO) {
-                mViewModel.exportBatchCount = totalRecord / CSV_MAX_ROW
-                progress_file_output.max= mViewModel.exportBatchCount+1
+                mViewModel.exportBatchCount = (totalRecord.toFloat() / fileRecordLimit).toBigDecimal(
+                    MathContext.DECIMAL32).setScale(0, RoundingMode.UP).toInt()
+                progress_file_output.max = mViewModel.exportBatchCount
 
                 println("MainActivity.downloadFile, batchCount:${mViewModel.exportBatchCount}")
                 var repeat = 0
@@ -1035,8 +1024,8 @@ class MainActivity : AppCompatActivity() {
                                 withContext(Dispatchers.IO) {
 
                                     mViewModel.queryRecordByCount(
-                                        CSV_MAX_ROW,
-                                        repeat * CSV_MAX_ROW
+                                        fileRecordLimit,
+                                        repeat * fileRecordLimit
                                     )
                                 }
                             repeat++
@@ -1046,7 +1035,7 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
 
-                saveFile("PolarOH1_${DATE_FORMAT.format(Date())}_${mViewModel.exportFileCount+1}.csv")
+                saveFile("PolarOH1_${DATE_FORMAT.format(Date())}_${mViewModel.exportFileCount + 1}.csv")
 
                 /* for (index in 0..batchCount) {
                      println("MainActivity.downloadFile, consumeEach: $index")
@@ -1234,16 +1223,16 @@ class MainActivity : AppCompatActivity() {
 
             //顯示CSV格式轉換處理進度
             withContext(Dispatchers.Main) {
-                progress_file_output.progress =  mViewModel.exportFileCount+1
+                progress_file_output.progress = mViewModel.exportFileCount+1
                 tv_loading.text = "${progress_file_output.progress}/${progress_file_output.max}"
-                progress_file_loading.isVisible = progress_file_output.progress != progress_file_output.max
+                progress_file_loading.isVisible =
+                    progress_file_output.progress != progress_file_output.max
             }
 
             mViewModel.exportFileCount++
-            if (mViewModel.exportFileCount <= mViewModel.exportBatchCount) {
-                saveFile("PolarOH1_${DATE_FORMAT.format(Date())}_${mViewModel.exportFileCount+1}.csv")
+            if (mViewModel.exportFileCount < mViewModel.exportBatchCount) {
+                saveFile("PolarOH1_${DATE_FORMAT.format(Date())}_${mViewModel.exportFileCount + 1}.csv")
             }
-
 
 
         }
@@ -1275,10 +1264,10 @@ class MainActivity : AppCompatActivity() {
 
                     mViewModel.recordChannel?.receiveOrNull()?.apply {
                         println("MainActivity.onActivityResult receiveOrNull:${this.size}, ${mViewModel.exportFileCount}/${mViewModel.exportBatchCount}")
-                       /* mViewModel.exportFileCount++
-                        if (mViewModel.exportFileCount <= mViewModel.exportBatchCount) {
-                            saveFile("PolarOH1_${DATE_FORMAT.format(Date())}_${mViewModel.exportFileCount}.csv")
-                        }*/
+                        /* mViewModel.exportFileCount++
+                         if (mViewModel.exportFileCount <= mViewModel.exportBatchCount) {
+                             saveFile("PolarOH1_${DATE_FORMAT.format(Date())}_${mViewModel.exportFileCount}.csv")
+                         }*/
                         writeCSV(this@fileUri, this)
                     }
 
@@ -1287,6 +1276,26 @@ class MainActivity : AppCompatActivity() {
         }
 
 
+    }
+
+    private suspend fun insertSampleRecords(counts:Int) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val records = RepositoryKit.queryRecordByCount(10, 0)
+            val new = RecordEntity()
+            records.last().apply {
+                new.hrList = hrList
+                new.ppg1List = ppg1List
+                new.ppg2List = ppg2List
+                new.ppg3List = ppg3List
+                new.ambient1List = ambient1List
+                new.accXList = accXList
+                new.accYList = accYList
+                new.accZList = accZList
+            }
+            for (i in 1..counts) {
+                RepositoryKit.insertRecord(new)
+            }
+        }
     }
 }
 

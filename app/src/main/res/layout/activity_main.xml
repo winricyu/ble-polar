@@ -386,7 +386,6 @@
             android:padding="8dp"
             android:textColor="@color/teal_700"
             android:textSize="14sp"
-            app:layout_constraintBottom_toBottomOf="@+id/btn_download"
             app:layout_constraintEnd_toStartOf="@+id/guideline"
             app:layout_constraintStart_toStartOf="@id/guideline_start"
             app:layout_constraintTop_toBottomOf="@+id/panel_content"
@@ -395,35 +394,26 @@
 
         <ImageButton
             android:id="@+id/btn_download"
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:layout_marginEnd="8dp"
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:contentDescription="download_data"
             android:elevation="8dp"
             android:padding="8dp"
-            app:layout_constraintDimensionRatio="1:1"
-            app:layout_constraintEnd_toStartOf="@+id/btn_clear"
-            app:layout_constraintTop_toBottomOf="@+id/panel_content"
             app:srcCompat="@drawable/ic_baseline_cloud_download_24"
             app:tint="@color/download_button_state" />
 
 
         <ImageButton
             android:id="@+id/btn_clear"
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:layout_marginEnd="4dp"
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:contentDescription="delete_data"
             android:elevation="8dp"
             android:enabled="false"
             android:padding="8dp"
             app:layout_constraintDimensionRatio="1:1"
-            app:layout_constraintEnd_toStartOf="@+id/guideline_end"
-            app:layout_constraintTop_toBottomOf="@+id/panel_content"
             app:srcCompat="@drawable/ic_baseline_delete_forever_24"
             app:tint="@color/download_button_state" />
 
@@ -479,6 +469,35 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             tools:text="v1.0.3" />
+
+        <androidx.constraintlayout.helper.widget.Flow
+            android:id="@+id/flow_export"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:background="#FFFFFF"
+            app:constraint_referenced_ids="input_layout_export,btn_download,btn_clear"
+            app:flow_horizontalGap="16dp"
+            app:layout_constraintEnd_toEndOf="@id/guideline_end"
+            app:layout_constraintStart_toStartOf="@id/guideline_start"
+            app:layout_constraintTop_toBottomOf="@id/progress_file_output" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/input_layout_export"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/edt_export"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="設定匯出 CSV 單檔資料筆數"
+                android:inputType="phone"
+                android:maxLength="4"
+                android:text="3600" />
+
+        </com.google.android.material.textfield.TextInputLayout>
 
         <androidx.constraintlayout.widget.Guideline
             android:id="@+id/guideline"
