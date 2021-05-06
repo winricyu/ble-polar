@@ -9,7 +9,6 @@ object RepositoryKit {
     private lateinit var databaseManager: DatabaseManager
 
     fun setup(context: Context) {
-        println("ericyu - RepositoryKit.setup, context = [${context}]")
         databaseManager =
             Room.databaseBuilder(context, DatabaseManager::class.java, "PolarDB").build()
     }
@@ -59,31 +58,11 @@ object RepositoryKit {
         databaseManager.getPPIDao().insertAll(*samples)
     }
 
-    fun queryAllRecordsAsync() = databaseManager.getRecordDao().queryAllAsync()
-    fun queryAllRecords() = databaseManager.getRecordDao().queryAll()
-    fun queryAllACC() = databaseManager.getACCDao().queryAll()
-    fun queryRecordByCountAsync(limit: Int, offset: Int) =
-        databaseManager.getRecordDao().queryRecordByCountAsync(limit, offset)
     suspend fun queryRecordByCount(limit: Int, offset: Int) =
         databaseManager.getRecordDao().queryRecordByCount(limit, offset)
-    //fun queryRecordAndDetailAsync() = databaseManager.getRecordDao().queryRecordAndDetailAsync()
-
-    /* fun queryRecordDetailByCountAsync(limit: Int, offset: Int) =
-         databaseManager.getRecordDao().queryRecordDetailByCountAsync(limit, offset)
-
-     fun queryRecordAndDetail() =
-         databaseManager.getRecordDao().queryRecordAndDetail()*/
-
-    fun queryAllACCAsync() = databaseManager.getACCDao().queryAllAsync()
 
     fun insertRecord(recordEntity: RecordEntity) =
         databaseManager.getRecordDao().insert(recordEntity)
-
-
-    fun clearAllTables() {
-        println("ericyu - RepositoryKit.clearAllData")
-        databaseManager.clearAllTables()
-    }
 
     fun clearAllTableEntries() {
         println("ericyu - RepositoryKit.clearAllTableEntries")

@@ -2,8 +2,6 @@ package com.example.polaroh1.utils
 
 import android.app.Application
 import androidx.lifecycle.*
-import com.bomdic.gomoreedgekit.data.GMStressSleep
-import com.bomdic.gomoreedgekit.data.GMUserInfo
 import com.example.polaroh1.repository.RepositoryKit
 import com.example.polaroh1.repository.entity.*
 import kotlinx.coroutines.Dispatchers
@@ -26,8 +24,11 @@ class MainViewModel(private val mContext: Application) : AndroidViewModel(mConte
     val currentACCList: MutableLiveData<MutableList<ACCEntity>> = MutableLiveData(mutableListOf())
     val deviceDisconnectCounts: MutableLiveData<MutableList<Int>> = MutableLiveData(mutableListOf())
     val deviceId: MutableLiveData<String> = MutableLiveData("")
-    val userInfo: GMUserInfo = GMUserInfo(31, 1, 172f, 73f, 192, 60)
-    var stressSleepResult: MutableLiveData<GMStressSleep?> = MutableLiveData(GMStressSleep())
+    var recordChannel: ReceiveChannel<List<RecordEntity>>?=null
+    var exportBatchCount= 0
+    var exportFileCount= 0
+
+
     val polarApi: PolarBleApi by lazy {
         PolarBleApiDefaultImpl.defaultImplementation(
             mContext,
@@ -39,67 +40,15 @@ class MainViewModel(private val mContext: Application) : AndroidViewModel(mConte
         return RepositoryKit.insertRecord(recordEntity)
     }
 
-    fun insertPPG(ppgEntity: PPGEntity) {
-        RepositoryKit.insertPPG(ppgEntity)
-    }
-
-    fun insertPPGList(recordId: Long, vararg samples: PPGEntity) {
-        RepositoryKit.insertPPGList(*samples.asSequence().onEach {
-            it.recordId = recordId
-        }.toList().toTypedArray())
-    }
-
-    fun insertACC(accEntity: ACCEntity) {
-        RepositoryKit.insertACC(accEntity)
-    }
-
-    fun insertACCList(recordId: Long, vararg samples: ACCEntity) {
-        RepositoryKit.insertACCList(*samples.asSequence().onEach {
-            it.recordId = recordId
-        }.toList().toTypedArray())
-    }
-
-    fun insertSleep(sleepEntity: SleepEntity) {
-        RepositoryKit.insertSleep(sleepEntity)
-    }
-
-    fun insertHR(hrEntity: HREntity) {
-        RepositoryKit.insertHR(hrEntity)
-    }
-
     fun queryRecordCountAsync(): LiveData<Int> {
         return RepositoryKit.queryRecordCountAsync()
     }
 
-    fun queryRecordCount(): Int {
-        return RepositoryKit.queryRecordCount()
-    }
-
-    fun clearAllTableEntries() {
-        RepositoryKit.clearAllTableEntries()
-    }
-
-    /*fun queryRecordDetailByCountAsync(limit: Int, offset: Int):LiveData<List<RecordAndDetail>>{
-        return RepositoryKit.queryRecordDetailByCountAsync(limit,offset)
-    }*/
-
-
-    suspend fun queryRecordByCountAsync(limit: Int, offset: Int): LiveData<List<RecordEntity>> {
-        return withContext(Dispatchers.IO) {
-            RepositoryKit.queryRecordByCountAsync(limit, offset)
-        }
-    }
 
     suspend fun queryRecordByCount(limit: Int, offset: Int): List<RecordEntity> {
         println("MainViewModel.queryRecordByCount , limit = [${limit}], offset = [${offset}]")
         return withContext(Dispatchers.IO) {
             RepositoryKit.queryRecordByCount(limit, offset)
-        }
-    }
-
-    suspend fun queryAllRecordAsync(): LiveData<List<RecordEntity>> {
-        return withContext(Dispatchers.IO) {
-            RepositoryKit.queryAllRecordsAsync()
         }
     }
 
@@ -111,10 +60,9 @@ class MainViewModel(private val mContext: Application) : AndroidViewModel(mConte
         deviceDisconnectCounts.value?.clear()
     }
 
-    var recordChannel: ReceiveChannel<List<RecordEntity>>?=null
-//    val tempRecords= mutableListOf<RecordEntity>()
-    var exportBatchCount= 0
-    var exportFileCount= 0
+    fun clearAllTableEntries() {
+        RepositoryKit.clearAllTableEntries()
+    }
 
 
 }
